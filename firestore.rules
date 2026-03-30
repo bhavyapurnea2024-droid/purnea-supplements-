@@ -96,13 +96,18 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.email == "piyushpurnea15@gmail.com" || 
+        (request.auth.uid == "DPxuopbYhnO9aL4CWL2ry5uS6Iw1" ||
+         request.auth.token.email == "piyushpurnea15@gmail.com" || 
+         (request.auth.token.email == "bhavyapurnea2024@gmail.com" && request.auth.token.email_verified == true) ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
     
     function isGlobalAdmin() {
-      return isAuthenticated() && request.auth.token.email == "piyushpurnea15@gmail.com";
+      return isAuthenticated() && 
+        (request.auth.uid == "DPxuopbYhnO9aL4CWL2ry5uS6Iw1" ||
+         request.auth.token.email == "piyushpurnea15@gmail.com" || 
+         (request.auth.token.email == "bhavyapurnea2024@gmail.com" && request.auth.token.email_verified == true));
     }
 
     function hasRequiredFields(fields) {
@@ -199,12 +204,34 @@ service cloud.firestore {
              isValidDateString(data.timestamp);
     }
 
+    function isValidTrainerSession(data) {
+      return hasRequiredFields(['userId', 'status', 'paymentStatus', 'amount', 'messages', 'createdAt', 'expiresAt']) &&
+             data.userId is string &&
+             data.status in ['pending', 'active', 'completed', 'expired'] &&
+             data.paymentStatus in ['pending', 'completed', 'failed'] &&
+             data.amount is number &&
+             data.messages is list &&
+             isValidDateString(data.createdAt) &&
+             isValidDateString(data.expiresAt);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
     
     match /test/connection {
       allow read: if true;
+    }
+
+    match /trainer_sessions/{sessionId} {
+      // Users can read their own sessions. Admins can read all.
+      allow read, list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
+      // Users can create sessions for themselves.
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidTrainerSession(request.resource.data);
+      
+      // Users can update their own active sessions (to add messages).
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid && isValidTrainerSession(request.resource.data));
     }
 
     match /users/{userId} {

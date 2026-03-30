@@ -20,3 +20,5 @@ export const MIN_WITHDRAWAL_AMOUNT = 300;
 export const WHATSAPP_NUMBER = '+917488804611';
 export const INSTAGRAM_HANDLE = '@PURNEA_SUPPLEMENTS';
 export const INSTAGRAM_URL = 'https://www.instagram.com/purnea_supplements';
+export const AI_TRAINER_PRICE = 149;
+export const AI_TRAINER_SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in ms

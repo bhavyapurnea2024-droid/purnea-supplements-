@@ -122,6 +122,24 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["defaultCommissionRate", "minWithdrawalAmount", "updatedAt"]
+    },
+    "TrainerSession": {
+      "title": "Trainer Session",
+      "description": "Stores AI Trainer sessions and plans.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "active", "completed", "expired"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "amount": { "type": "number" },
+        "messages": { "type": "array", "items": { "type": "object" } },
+        "dietPlan": { "type": "string" },
+        "workoutPlan": { "type": "string" },
+        "answers": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "status", "paymentStatus", "amount", "messages", "createdAt", "expiresAt"]
     }
   },
   "firestore": {
@@ -131,6 +149,7 @@
     "/referrals/{referralId}": { "schema": "Referral", "description": "Referral tracking." },
     "/withdrawals/{withdrawalId}": { "schema": "WithdrawalRequest", "description": "Withdrawal requests." },
     "/audit_logs/{logId}": { "schema": "AuditLog", "description": "System audit logs." },
-    "/settings/global": { "schema": "GlobalSettings", "description": "Global platform settings." }
+    "/settings/global": { "schema": "GlobalSettings", "description": "Global platform settings." },
+    "/trainer_sessions/{sessionId}": { "schema": "TrainerSession", "description": "AI Trainer sessions." }
   }
 }

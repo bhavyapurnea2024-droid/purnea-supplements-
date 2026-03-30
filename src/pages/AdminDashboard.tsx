@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, getDoc, setDoc, orderBy, getDocs, where, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { Product, Order, UserProfile, WithdrawalRequest, Referral, AuditLog } from '../types';
-import { LayoutDashboard, Package, ShoppingBag, Users, Ticket, Wallet, BarChart3, Plus, Search, Filter, Edit2, Trash2, CheckCircle2, XCircle, Clock, ChevronRight, ArrowUpRight, ArrowDownRight, MoreVertical, Save, X, Image as ImageIcon, Star, TrendingUp, RefreshCw, Eye, History, Phone } from 'lucide-react';
+import { Product, Order, UserProfile, WithdrawalRequest, Referral, AuditLog, TrainerSession } from '../types';
+import { LayoutDashboard, Package, ShoppingBag, Users, Ticket, Wallet, BarChart3, Plus, Search, Filter, Edit2, Trash2, CheckCircle2, XCircle, Clock, ChevronRight, ArrowUpRight, ArrowDownRight, MoreVertical, Save, X, Image as ImageIcon, Star, TrendingUp, RefreshCw, Eye, History, Phone, Dumbbell, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -48,6 +48,7 @@ const AdminDashboard = () => {
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Withdrawals', path: '/admin/withdrawals', icon: Wallet },
     { name: 'Referrals', path: '/admin/referrals', icon: Ticket },
+    { name: 'AI Trainer', path: '/admin/trainer', icon: Dumbbell },
     { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
     { name: 'Audit Logs', path: '/admin/audit-logs', icon: History },
     { name: 'Settings', path: '/admin/settings', icon: MoreVertical },
@@ -85,6 +86,7 @@ const AdminDashboard = () => {
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/withdrawals" element={<AdminWithdrawals />} />
           <Route path="/referrals" element={<AdminReferrals />} />
+          <Route path="/trainer" element={<AdminTrainerSessions />} />
           <Route path="/analytics" element={<AdminAnalytics />} />
           <Route path="/audit-logs" element={<AdminAuditLogs />} />
           <Route path="/settings" element={<AdminSettings />} />
@@ -103,6 +105,8 @@ const AdminOverview = () => {
     totalUsers: 0,
     totalCommission: 0,
     totalProducts: 0,
+    trainerRevenue: 0,
+    trainerSessions: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,6 +115,14 @@ const AdminOverview = () => {
   const [salesData, setSalesData] = useState<any[]>([]);
 
   useEffect(() => {
+    const unsubTrainer = onSnapshot(collection(db, 'trainer_sessions'), (snapshot) => {
+      const sessions = snapshot.docs.map(doc => doc.data());
+      const revenue = sessions.reduce((sum, s) => sum + (s.amount || 0), 0);
+      setStats(prev => ({ ...prev, trainerRevenue: revenue, trainerSessions: snapshot.size }));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'trainer_sessions');
+    });
+
     const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), (snapshot) => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setRecentOrders(orders.slice(0, 5));
@@ -172,6 +184,7 @@ const AdminOverview = () => {
       unsubReferrals();
       unsubProducts();
       unsubWithdrawals();
+      unsubTrainer();
     };
   }, []);
 
@@ -196,12 +209,14 @@ const AdminOverview = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
           { label: 'Total Sales', value: `₹${stats.totalSales.toLocaleString()}`, icon: ShoppingBag, color: 'orange' },
           { label: 'Total Orders', value: stats.totalOrders, icon: Package, color: 'blue' },
           { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'purple' },
           { label: 'Commission Paid', value: `₹${stats.totalCommission.toLocaleString()}`, icon: Ticket, color: 'green' },
+          { label: 'Trainer Revenue', value: `₹${stats.trainerRevenue.toLocaleString()}`, icon: Dumbbell, color: 'orange' },
+          { label: 'Trainer Sessions', value: stats.trainerSessions, icon: MessageSquare, color: 'blue' },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <div className={cn(
@@ -456,7 +471,7 @@ const AdminProducts = () => {
       }
       setIsModalOpen(false);
       setEditingProduct(null);
-      setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''] });
+      setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: DEFAULT_COMMISSION_RATE });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'products');
     } finally {
@@ -1731,6 +1746,66 @@ const AdminSettings = () => {
         >
           <Save className="w-5 h-5" /> Save Configuration
         </button>
+      </div>
+    </div>
+  );
+};
+
+const AdminTrainerSessions = () => {
+  const [sessions, setSessions] = useState<TrainerSession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'trainer_sessions'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TrainerSession)));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'trainer_sessions');
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <div className="space-y-12">
+      <div>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">AI Trainer <span className="text-orange-600">Sessions</span></h1>
+        <p className="text-gray-500 mt-2">Monitor AI Trainer interactions and revenue.</p>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User ID</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Messages</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Created At</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Expires At</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {sessions.map(session => (
+              <tr key={session.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-bold text-gray-900">{session.userId.slice(0, 8)}...</td>
+                <td className="px-6 py-4 text-sm font-black text-gray-900">₹{session.amount}</td>
+                <td className="px-6 py-4 text-sm text-gray-600">{session.messages.length}</td>
+                <td className="px-6 py-4">
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    session.status === 'active' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                  )}>
+                    {session.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-xs text-gray-500">{new Date(session.createdAt).toLocaleString()}</td>
+                <td className="px-6 py-4 text-xs text-gray-500">{new Date(session.expiresAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

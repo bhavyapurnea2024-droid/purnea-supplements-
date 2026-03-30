@@ -43,6 +43,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   image: string;
+  category: string;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -99,4 +100,24 @@ export interface AuditLog {
   details: string;
   timestamp: string;
   type: 'user' | 'admin';
+}
+
+export interface TrainerSession {
+  id: string;
+  userId: string;
+  status: 'pending' | 'active' | 'completed' | 'expired';
+  paymentStatus: 'pending' | 'completed' | 'failed';
+  amount: number;
+  messages: TrainerMessage[];
+  dietPlan?: string;
+  workoutPlan?: string;
+  answers?: Record<string, string>;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface TrainerMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: string;
 }

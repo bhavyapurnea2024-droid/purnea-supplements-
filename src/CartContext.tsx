@@ -45,6 +45,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         price: product.discountPrice || product.price,
         quantity,
         image: product.images[0] || 'https://picsum.photos/seed/supplement/200/200',
+        category: product.category,
       }];
     });
   };

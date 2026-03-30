@@ -5,11 +5,11 @@ import { db, handleFirestoreError, OperationType, auth, logAction } from '../fir
 import { useCart } from '../CartContext';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { ChevronRight, ShieldCheck, CreditCard, Truck, CheckCircle2, AlertCircle, ShoppingBag, ArrowRight, Wallet } from 'lucide-react';
+import { ChevronRight, ShieldCheck, CreditCard, Truck, CheckCircle2, AlertCircle, ShoppingBag, ArrowRight, Wallet, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Order, UserProfile } from '../types';
-import { DEFAULT_DISCOUNT_RATE } from '../constants';
+import { DEFAULT_DISCOUNT_RATE, WHATSAPP_NUMBER } from '../constants';
 
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
@@ -19,7 +19,7 @@ const CheckoutPage = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; userId: string; discount: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; userId: string; discount: number; commissionRate: number } | null>(null);
   
   const [address, setAddress] = useState({
     fullName: user?.displayName || '',
@@ -51,6 +51,8 @@ const CheckoutPage = () => {
       navigate('/shop');
     }
   }, [items, user, navigate]);
+
+  const [paymentStep, setPaymentStep] = useState<'selection' | 'processing' | 'success'>('selection');
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -93,9 +95,13 @@ const CheckoutPage = () => {
   const handlePlaceOrder = async () => {
     if (!user) return;
     setLoading(true);
+    setPaymentStep('processing');
     
     const totalAmount = subtotal - (appliedCoupon?.discount || 0);
     
+    // Simulate payment gateway delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     try {
       const orderData: Omit<Order, 'id'> = {
         userId: user.uid,
@@ -135,10 +141,30 @@ const CheckoutPage = () => {
         });
       }
 
-      toast.success('Order placed successfully!');
-      clearCart();
-      navigate('/orders');
+      setPaymentStep('success');
+      toast.success('Payment Successful & Order Placed!');
+      
+      // Generate WhatsApp message for the admin
+      const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+      const whatsappMessage = `*New Order Received!*%0A%0A` +
+        `*Order ID:* %23${orderRef.id.slice(-6).toUpperCase()}%0A` +
+        `*Customer:* ${address.fullName}%0A` +
+        `*Phone:* ${address.phone}%0A` +
+        `*Total:* ₹${totalAmount}%0A` +
+        `*Items:* ${itemsList}%0A` +
+        `*Address:* ${address.addressLine1}, ${address.city}, ${address.state} - ${address.zipCode}%0A%0A` +
+        `_Please process this order as soon as possible._`;
+
+      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
+      
+      // Open WhatsApp to notify admin
+      window.open(whatsappUrl, '_blank');
+      
+      setTimeout(() => {
+        clearCart();
+      }, 1000);
     } catch (error) {
+      setPaymentStep('selection');
       handleFirestoreError(error, OperationType.CREATE, 'orders');
     } finally {
       setLoading(false);
@@ -150,10 +176,16 @@ const CheckoutPage = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
-          <Link to="/cart" className="hover:text-orange-600">Cart</Link>
-          <ChevronRight className="w-4 h-4" />
-          <span className="text-gray-900 font-bold">Checkout</span>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Link to="/cart" className="hover:text-orange-600">Cart</Link>
+            <ChevronRight className="w-4 h-4" />
+            <span className="text-gray-900 font-bold">Checkout</span>
+          </div>
+          <div className="flex items-center gap-2 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
+            <ShieldCheck className="w-3 h-3" />
+            Test Mode Active
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -264,36 +296,72 @@ const CheckoutPage = () => {
 
               {step === 2 && (
                 <div className="space-y-6">
-                  <div className="p-6 border-2 border-orange-500 bg-orange-50 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <CreditCard className="w-6 h-6 text-orange-600" />
+                  {paymentStep === 'selection' ? (
+                    <>
+                      <div className="p-6 border-2 border-orange-500 bg-orange-50 rounded-2xl flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <CreditCard className="w-6 h-6 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900">Secure Online Payment</p>
+                            <p className="text-xs text-gray-500">Pay via UPI, Cards, or Netbanking</p>
+                          </div>
+                        </div>
+                        <CheckCircle2 className="w-6 h-6 text-orange-600" />
                       </div>
-                      <div>
-                        <p className="font-bold text-gray-900">Secure Online Payment</p>
-                        <p className="text-xs text-gray-500">Pay via UPI, Cards, or Netbanking</p>
+
+                      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                        <div className="flex items-center gap-3 mb-4">
+                          <ShieldCheck className="w-5 h-5 text-green-600" />
+                          <p className="text-sm font-bold text-gray-900">100% Secure Transaction</p>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          Your payment is processed securely. We do not store your card details. By clicking "Place Order", you agree to our terms and conditions.
+                        </p>
+                      </div>
+
+                      <button 
+                        onClick={handlePlaceOrder}
+                        disabled={loading}
+                        className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
+                      >
+                        {loading ? 'Processing...' : `Pay ₹${finalTotal} & Place Order`}
+                      </button>
+                    </>
+                  ) : paymentStep === 'processing' ? (
+                    <div className="py-12 text-center">
+                      <div className="w-16 h-16 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Processing Payment</h3>
+                      <p className="text-sm text-gray-500">Please do not refresh or close this window...</p>
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center">
+                      <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <CheckCircle2 className="w-10 h-10" />
+                      </div>
+                      <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight mb-2">Payment Successful!</h3>
+                      <p className="text-sm text-gray-500 mb-8">Your order has been placed and we've notified the admin.</p>
+                      
+                      <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                        <a 
+                          href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent('Hi, I just placed an order on Purnea Supps. Please check my order details.')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-bold text-sm hover:bg-green-600 transition-all"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Chat with Admin
+                        </a>
+                        <Link 
+                          to="/orders"
+                          className="text-gray-500 font-bold text-sm hover:underline"
+                        >
+                          View My Orders
+                        </Link>
                       </div>
                     </div>
-                    <CheckCircle2 className="w-6 h-6 text-orange-600" />
-                  </div>
-
-                  <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                    <div className="flex items-center gap-3 mb-4">
-                      <ShieldCheck className="w-5 h-5 text-green-600" />
-                      <p className="text-sm font-bold text-gray-900">100% Secure Transaction</p>
-                    </div>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      Your payment is processed securely. We do not store your card details. By clicking "Place Order", you agree to our terms and conditions.
-                    </p>
-                  </div>
-
-                  <button 
-                    onClick={handlePlaceOrder}
-                    disabled={loading}
-                    className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
-                  >
-                    {loading ? 'Processing...' : `Pay ₹${finalTotal} & Place Order`}
-                  </button>
+                  )}
                 </div>
               )}
             </div>
