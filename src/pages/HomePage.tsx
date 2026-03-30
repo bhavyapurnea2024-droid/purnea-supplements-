@@ -114,7 +114,7 @@ const HomePage = () => {
               <div className="space-y-4 mb-8">
                 {[
                   'Get a unique coupon code instantly',
-                  'Friends get 5% discount using your code',
+                  'Friends get 10-20% discount using your code',
                   'You earn 5% commission on every order',
                   'Withdraw earnings directly to your UPI'
                 ].map((text, i) => (

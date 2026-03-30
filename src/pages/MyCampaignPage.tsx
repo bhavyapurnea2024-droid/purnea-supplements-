@@ -295,7 +295,7 @@ const MyCampaignPage = () => {
                 </button>
               </div>
               <p className="text-sm text-orange-100 mb-8 leading-relaxed">
-                Share this code with your friends. They get a {(profile?.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05) * 100}% discount, and you earn {(profile?.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05) * 100}% commission on every order they place.
+                Share this code with your friends. They get a 10-20% discount, and you earn {(profile?.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05) * 100}% commission on every order they place.
               </p>
               <button className="w-full bg-white text-orange-600 py-4 rounded-xl font-bold hover:bg-orange-50 transition-all flex items-center justify-center gap-2">
                 <Share2 className="w-5 h-5" /> Share Now
@@ -308,7 +308,7 @@ const MyCampaignPage = () => {
               <div className="space-y-8">
                 {[
                   { icon: Users, title: 'Share Code', desc: 'Share your unique coupon code with friends.' },
-                  { icon: ShoppingBag, title: 'Friend Buys', desc: `Friend gets ${(profile?.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05) * 100}% discount on their purchase.` },
+                  { icon: ShoppingBag, title: 'Friend Buys', desc: `Friend gets 10-20% discount on their purchase.` },
                   { icon: TrendingUp, title: 'Earn Commission', desc: `You earn ${(profile?.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05) * 100}% of the order value as commission.` },
                   { icon: Wallet, title: 'Withdraw', desc: `Withdraw earnings once you reach ₹${globalSettings?.minWithdrawalAmount || 300}.` },
                 ].map((step, i) => (

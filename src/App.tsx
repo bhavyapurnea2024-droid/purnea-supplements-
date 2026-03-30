@@ -1,12 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, User, LogOut, Menu, X, Search, Heart, Package, LayoutDashboard, Wallet, Settings, ShieldCheck, ChevronRight, Star, Plus, Minus, Trash2, CheckCircle2, AlertCircle, ArrowRight, Filter, IndianRupee } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Menu, X, Search, Heart, Package, LayoutDashboard, Wallet, Settings, ShieldCheck, ChevronRight, Star, Plus, Minus, Trash2, CheckCircle2, AlertCircle, ArrowRight, Filter, IndianRupee, Instagram, MessageCircle } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { CartProvider, useCart } from './CartContext';
 import { cn } from './lib/utils';
-import { CATEGORIES, GOALS, MIN_WITHDRAWAL_AMOUNT } from './constants';
+import { CATEGORIES, GOALS, MIN_WITHDRAWAL_AMOUNT, WHATSAPP_NUMBER, INSTAGRAM_HANDLE, INSTAGRAM_URL } from './constants';
 
 // Pages (to be implemented in separate files or inline for now)
 import HomePage from './pages/HomePage';
@@ -216,10 +216,28 @@ const Footer = () => (
         <div>
           <h4 className="text-white font-bold mb-6">Support</h4>
           <ul className="space-y-4 text-sm">
-            <li><Link to="/contact" className="hover:text-orange-500 transition-colors">Contact Support</Link></li>
+            <li>
+              <a 
+                href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`} 
+                target="_blank" 
+                rel="noreferrer"
+                className="flex items-center gap-2 hover:text-orange-500 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" /> WhatsApp Support
+              </a>
+            </li>
+            <li>
+              <a 
+                href={INSTAGRAM_URL} 
+                target="_blank" 
+                rel="noreferrer"
+                className="flex items-center gap-2 hover:text-orange-500 transition-colors"
+              >
+                <Instagram className="w-4 h-4" /> Instagram {INSTAGRAM_HANDLE}
+              </a>
+            </li>
             <li><Link to="/faq" className="hover:text-orange-500 transition-colors">FAQs</Link></li>
             <li><Link to="/privacy" className="hover:text-orange-500 transition-colors">Privacy Policy</Link></li>
-            <li><Link to="/terms" className="hover:text-orange-500 transition-colors">Terms of Service</Link></li>
           </ul>
         </div>
       </div>
@@ -254,6 +272,21 @@ const AppContent = () => {
           </Routes>
         </main>
         <Footer />
+        
+        {/* Floating WhatsApp Button */}
+        <a 
+          href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`}
+          target="_blank"
+          rel="noreferrer"
+          className="fixed bottom-6 right-6 z-[60] bg-green-500 text-white p-4 rounded-full shadow-2xl shadow-green-500/40 hover:bg-green-600 hover:scale-110 transition-all group active:scale-95"
+          title="Contact on WhatsApp"
+        >
+          <MessageCircle className="w-6 h-6 fill-current" />
+          <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            Chat with us
+          </span>
+        </a>
+
         <Toaster position="top-center" richColors />
         <LoginModal 
           isOpen={isLoginModalOpen} 

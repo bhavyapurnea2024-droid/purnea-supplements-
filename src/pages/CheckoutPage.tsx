@@ -9,6 +9,7 @@ import { ChevronRight, ShieldCheck, CreditCard, Truck, CheckCircle2, AlertCircle
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Order, UserProfile } from '../types';
+import { DEFAULT_DISCOUNT_RATE } from '../constants';
 
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
@@ -71,14 +72,15 @@ const CheckoutPage = () => {
           setAppliedCoupon(null);
         } else {
           const commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05;
-          const discount = subtotal * commissionRate;
+          const discountRate = DEFAULT_DISCOUNT_RATE; // 10% for friend
+          const discount = subtotal * discountRate;
           setAppliedCoupon({
             code: couponCode.toUpperCase(),
             userId: couponOwner.uid,
             discount,
             commissionRate
           });
-          toast.success(`Coupon applied! ${(commissionRate * 100).toFixed(0)}% discount added.`);
+          toast.success(`Coupon applied! ${(discountRate * 100).toFixed(0)}% discount added.`);
         }
       }
     } catch (error) {
@@ -112,23 +114,23 @@ const CheckoutPage = () => {
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
       await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount}`, 'user');
       
-      // If referral used, update referral user's pending wallet
+      // If referral used, update referral user's wallet instantly
       if (appliedCoupon) {
-        const commissionAmount = appliedCoupon.discount;
+        const commissionAmount = subtotal * appliedCoupon.commissionRate;
         
         // Create referral record
         await addDoc(collection(db, 'referrals'), {
           couponOwnerId: appliedCoupon.userId,
           orderId: orderRef.id,
           amount: commissionAmount,
-          status: 'pending',
+          status: 'earned', // Set to earned instantly as requested
           createdAt: new Date().toISOString(),
         });
 
-        // Update user wallet
+        // Update user wallet instantly to withdrawable
         const userRef = doc(db, 'users', appliedCoupon.userId);
         await updateDoc(userRef, {
-          'wallet.pending': increment(commissionAmount),
+          'wallet.withdrawable': increment(commissionAmount),
           'wallet.totalEarned': increment(commissionAmount),
         });
       }
@@ -367,7 +369,7 @@ const CheckoutPage = () => {
                   <p className="text-xs font-bold text-orange-900 uppercase tracking-tight">Referral Benefits</p>
                 </div>
                 <p className="text-[10px] text-orange-700 leading-relaxed">
-                  Using a referral code saves you 5% and helps your friend earn commission. It's a win-win!
+                  Using a referral code saves you 10-20% and helps your friend earn commission. It's a win-win!
                 </p>
               </div>
             </div>

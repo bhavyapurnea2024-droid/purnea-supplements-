@@ -340,7 +340,10 @@ const AdminOverview = () => {
                       </div>
                       <div>
                         <p className="text-sm font-black text-gray-900 uppercase truncate w-32">{user.displayName || 'User'}</p>
-                        <p className="text-[10px] text-gray-400 font-bold">{user.email}</p>
+                        <div className="flex flex-col">
+                          <p className="text-[10px] text-gray-400 font-bold">{user.email}</p>
+                          <p className="text-[10px] text-orange-600 font-black">{user.phoneNumber || 'No Phone'}</p>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1111,6 +1114,27 @@ const AdminUsers = () => {
     }
   };
 
+  const updateCouponCode = async (userId: string, newCode: string) => {
+    if (!newCode.trim()) return;
+    try {
+      // Check if code already exists
+      const q = query(collection(db, 'users'), where('couponCode', '==', newCode.toUpperCase()));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty && snapshot.docs[0].id !== userId) {
+        toast.error('Coupon code already in use');
+        return;
+      }
+
+      await updateDoc(doc(db, 'users', userId), { couponCode: newCode.toUpperCase() });
+      if (adminProfile) {
+        await logAction(adminProfile.uid, adminProfile.email, adminProfile.displayName, 'UPDATE_USER_COUPON', `Updated coupon code for user ID: ${userId} to ${newCode.toUpperCase()}`, 'admin');
+      }
+      toast.success('Coupon code updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
+
   const toggleBlockStatus = async (userId: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, 'users', userId), { isBlocked: !currentStatus });
@@ -1160,13 +1184,22 @@ const AdminUsers = () => {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">{user.phoneNumber || 'N/A'}</td>
                 <td className="px-6 py-4">
-                  <div className="flex flex-col">
-                    <span className={cn(
-                      "text-sm font-black tracking-widest",
-                      user.isCouponDisabled ? "text-gray-400 line-through" : "text-orange-600"
-                    )}>
-                      {user.couponCode}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text"
+                        defaultValue={user.couponCode}
+                        onBlur={(e) => {
+                          if (e.target.value !== user.couponCode) {
+                            updateCouponCode(user.uid, e.target.value);
+                          }
+                        }}
+                        className={cn(
+                          "w-24 bg-gray-50 border-none rounded-lg px-2 py-1 text-xs font-black tracking-widest focus:ring-2 ring-orange-500/20",
+                          user.isCouponDisabled ? "text-gray-400 line-through" : "text-orange-600"
+                        )}
+                      />
+                    </div>
                     {user.isCouponDisabled && <span className="text-[8px] font-black text-red-500 uppercase">Disabled</span>}
                   </div>
                 </td>
