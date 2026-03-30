@@ -89,3 +89,14 @@ export interface WithdrawalRequest {
   createdAt: string;
   processedAt?: string;
 }
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  action: string;
+  details: string;
+  timestamp: string;
+  type: 'user' | 'admin';
+}

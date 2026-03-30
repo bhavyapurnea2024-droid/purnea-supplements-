@@ -69,6 +69,17 @@ service cloud.firestore {
     //   - createdAt: string (required, ISO 8601)
     //   - processedAt: string (optional)
     //
+    // Collection: audit_logs
+    // Document ID: logId
+    // Fields:
+    //   - userId: string (required)
+    //   - userEmail: string (required)
+    //   - userName: string (required)
+    //   - action: string (required)
+    //   - details: string (required)
+    //   - type: string (required, 'user' | 'admin')
+    //   - timestamp: string (required, ISO 8601)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -85,13 +96,13 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.email == "bhavyapurnea2024@gmail.com" || 
+        (request.auth.token.email == "piyushpurnea15@gmail.com" || 
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
     
     function isGlobalAdmin() {
-      return isAuthenticated() && request.auth.token.email == "bhavyapurnea2024@gmail.com";
+      return isAuthenticated() && request.auth.token.email == "piyushpurnea15@gmail.com";
     }
 
     function hasRequiredFields(fields) {
@@ -177,6 +188,17 @@ service cloud.firestore {
              isValidDateString(data.createdAt);
     }
 
+    function isValidAuditLog(data) {
+      return hasRequiredFields(['userId', 'userEmail', 'userName', 'action', 'details', 'type', 'timestamp']) &&
+             data.userId is string &&
+             data.userEmail is string &&
+             data.userName is string &&
+             data.action is string &&
+             data.details is string &&
+             data.type in ['user', 'admin'] &&
+             isValidDateString(data.timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -250,6 +272,17 @@ service cloud.firestore {
       
       // Only global admin can manage settings.
       allow write: if isGlobalAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      // Only admins can read audit logs.
+      allow read, list: if isAdmin();
+      
+      // Authenticated users can create logs.
+      allow create: if isAuthenticated() && isValidAuditLog(request.resource.data);
+      
+      // Logs are immutable.
+      allow update, delete: if false;
     }
   }
 }

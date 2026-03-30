@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, increment, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { Referral, WithdrawalRequest } from '../types';
 import { Link } from 'react-router-dom';
@@ -94,6 +94,7 @@ const MyCampaignPage = () => {
         upiId,
         createdAt: new Date().toISOString(),
       });
+      await logAction(user.uid, user.email || '', user.displayName || '', 'WITHDRAW_REQUEST', `Requested withdrawal of ₹${withdrawAmount} via UPI: ${upiId}`, 'user');
 
       // Deduct from withdrawable balance
       const userRef = doc(db, 'users', user.uid);

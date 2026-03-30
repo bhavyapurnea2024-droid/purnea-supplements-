@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, increment, getDoc, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, auth } from '../firebase';
+import { db, handleFirestoreError, OperationType, auth, logAction } from '../firebase';
 import { useCart } from '../CartContext';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
@@ -110,6 +110,7 @@ const CheckoutPage = () => {
       };
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount}`, 'user');
       
       // If referral used, update referral user's pending wallet
       if (appliedCoupon) {

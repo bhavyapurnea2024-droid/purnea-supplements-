@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, getDoc, setDoc, orderBy, getDocs, where, increment } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Product, Order, UserProfile, WithdrawalRequest, Referral } from '../types';
-import { LayoutDashboard, Package, ShoppingBag, Users, Ticket, Wallet, BarChart3, Plus, Search, Filter, Edit2, Trash2, CheckCircle2, XCircle, Clock, ChevronRight, ArrowUpRight, ArrowDownRight, MoreVertical, Save, X, Image as ImageIcon, Star, TrendingUp, RefreshCw, Eye } from 'lucide-react';
+import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
+import { Product, Order, UserProfile, WithdrawalRequest, Referral, AuditLog } from '../types';
+import { LayoutDashboard, Package, ShoppingBag, Users, Ticket, Wallet, BarChart3, Plus, Search, Filter, Edit2, Trash2, CheckCircle2, XCircle, Clock, ChevronRight, ArrowUpRight, ArrowDownRight, MoreVertical, Save, X, Image as ImageIcon, Star, TrendingUp, RefreshCw, Eye, History, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -49,6 +49,7 @@ const AdminDashboard = () => {
     { name: 'Withdrawals', path: '/admin/withdrawals', icon: Wallet },
     { name: 'Referrals', path: '/admin/referrals', icon: Ticket },
     { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
+    { name: 'Audit Logs', path: '/admin/audit-logs', icon: History },
     { name: 'Settings', path: '/admin/settings', icon: MoreVertical },
   ];
 
@@ -85,6 +86,7 @@ const AdminDashboard = () => {
           <Route path="/withdrawals" element={<AdminWithdrawals />} />
           <Route path="/referrals" element={<AdminReferrals />} />
           <Route path="/analytics" element={<AdminAnalytics />} />
+          <Route path="/audit-logs" element={<AdminAuditLogs />} />
           <Route path="/settings" element={<AdminSettings />} />
         </Routes>
       </main>
@@ -93,6 +95,8 @@ const AdminDashboard = () => {
 };
 
 const AdminOverview = () => {
+  const { user: authUser, profile: adminProfile } = useAuth();
+  const [commissionSearch, setCommissionSearch] = useState('');
   const [stats, setStats] = useState({
     totalSales: 0,
     totalOrders: 0,
@@ -135,7 +139,7 @@ const AdminOverview = () => {
     });
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const usrs = snapshot.docs.map(doc => doc.data() as UserProfile);
+      const usrs = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as unknown as UserProfile));
       setUsers(usrs);
       setStats(prev => ({ ...prev, totalUsers: snapshot.size }));
     }, (error) => {
@@ -170,6 +174,18 @@ const AdminOverview = () => {
       unsubWithdrawals();
     };
   }, []);
+
+  const updateCommission = async (userId: string, rate: number) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { customCommissionRate: rate });
+      if (adminProfile) {
+        await logAction(adminProfile.uid, adminProfile.email, adminProfile.displayName, 'UPDATE_USER_COMMISSION', `Updated commission rate for user ID: ${userId} to ${Math.round(rate * 100)}%`, 'admin');
+      }
+      toast.success('Commission rate updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
 
   return (
     <div className="space-y-12 pb-12">
@@ -295,6 +311,66 @@ const AdminOverview = () => {
             </div>
           </div>
 
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Commission Control</h2>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search users..." 
+                  className="pl-9 pr-4 py-1.5 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 ring-orange-500/20 w-40"
+                  onChange={(e) => setCommissionSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-hide">
+              {users
+                .filter(u => 
+                  u.displayName?.toLowerCase().includes(commissionSearch.toLowerCase()) || 
+                  u.email?.toLowerCase().includes(commissionSearch.toLowerCase()) ||
+                  u.phoneNumber?.includes(commissionSearch)
+                )
+                .map((user) => (
+                <div key={user.uid} className="group p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-orange-100 hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black">
+                        {user.displayName?.charAt(0) || 'U'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-gray-900 uppercase truncate w-32">{user.displayName || 'User'}</p>
+                        <p className="text-[10px] text-gray-400 font-bold">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        step="1"
+                        min="0"
+                        max="100"
+                        value={Math.round((user.customCommissionRate !== undefined ? user.customCommissionRate : (user.commissionRate || 0.05)) * 100)}
+                        onChange={(e) => updateCommission(user.uid, Number(e.target.value) / 100)}
+                        className="w-14 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-black text-center focus:ring-2 ring-orange-500/20"
+                      />
+                      <span className="text-xs font-black text-gray-400">%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100/50">
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500 font-bold">
+                      <Phone className="w-3 h-3" />
+                      <span>{user.phoneNumber || 'No Phone'}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Ticket className="w-3 h-3 text-orange-400" />
+                      <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">{user.couponCode}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="bg-gray-900 p-8 rounded-3xl text-white shadow-xl shadow-gray-900/20">
             <h2 className="text-xl font-black uppercase tracking-tight mb-8">Quick Actions</h2>
             <div className="space-y-4">
@@ -328,6 +404,7 @@ const AdminOverview = () => {
 };
 
 const AdminProducts = () => {
+  const { user: adminUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -367,9 +444,11 @@ const AdminProducts = () => {
 
       if (editingProduct) {
         await updateDoc(doc(db, 'products', editingProduct.id), productData);
+        await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'UPDATE_PRODUCT', `Updated product: ${productData.name}`, 'admin');
         toast.success('Product updated successfully');
       } else {
         await addDoc(collection(db, 'products'), productData);
+        await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'CREATE_PRODUCT', `Created product: ${productData.name}`, 'admin');
         toast.success('Product added successfully');
       }
       setIsModalOpen(false);
@@ -386,6 +465,7 @@ const AdminProducts = () => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
       await deleteDoc(doc(db, 'products', id));
+      await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'DELETE_PRODUCT', `Deleted product ID: ${id}`, 'admin');
       toast.success('Product deleted successfully');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
@@ -641,6 +721,7 @@ const AdminProducts = () => {
 };
 
 const AdminOrders = () => {
+  const { user: adminUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -664,6 +745,7 @@ const AdminOrders = () => {
       const oldStatus = orderData.status;
 
       await updateDoc(orderRef, { status, updatedAt: new Date().toISOString() });
+      await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'UPDATE_ORDER_STATUS', `Updated order #${orderId.slice(-6)} status to ${status}`, 'admin');
       toast.success(`Order status updated to ${status}`);
 
       // Logic for commission maturity
@@ -989,6 +1071,7 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
 };
 
 const AdminUsers = () => {
+  const { user: authUser, profile: adminProfile } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -1019,6 +1102,9 @@ const AdminUsers = () => {
   const updateCommission = async (userId: string, rate: number) => {
     try {
       await updateDoc(doc(db, 'users', userId), { customCommissionRate: rate });
+      if (adminProfile) {
+        await logAction(adminProfile.uid, adminProfile.email, adminProfile.displayName, 'UPDATE_USER_COMMISSION', `Updated commission rate for user ID: ${userId} to ${Math.round(rate * 100)}%`, 'admin');
+      }
       toast.success('Custom commission rate updated');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
@@ -1028,6 +1114,9 @@ const AdminUsers = () => {
   const toggleBlockStatus = async (userId: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, 'users', userId), { isBlocked: !currentStatus });
+      if (adminProfile) {
+        await logAction(adminProfile.uid, adminProfile.email, adminProfile.displayName, !currentStatus ? 'BLOCK_USER' : 'UNBLOCK_USER', `${!currentStatus ? 'Blocked' : 'Unblocked'} user ID: ${userId}`, 'admin');
+      }
       toast.success(!currentStatus ? 'User blocked' : 'User unblocked');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
@@ -1143,6 +1232,7 @@ const AdminUsers = () => {
 };
 
 const AdminWithdrawals = () => {
+  const { user: authUser, profile: adminProfile } = useAuth();
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
 
   useEffect(() => {
@@ -1160,6 +1250,9 @@ const AdminWithdrawals = () => {
         status, 
         processedAt: new Date().toISOString() 
       });
+      if (adminProfile) {
+        await logAction(adminProfile.uid, adminProfile.email, adminProfile.displayName, `WITHDRAWAL_${status.toUpperCase()}`, `${status.charAt(0).toUpperCase() + status.slice(1)} withdrawal request #${withdrawal.id.slice(-6)} for ₹${withdrawal.amount}`, 'admin');
+      }
       
       // If rejected, refund to withdrawable balance
       if (status === 'rejected') {
@@ -1405,7 +1498,86 @@ const AdminAnalytics = () => {
   );
 };
 
+const AdminAuditLogs = () => {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc')), (snapshot) => {
+      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AuditLog)));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'audit_logs');
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  return (
+    <div className="space-y-12">
+      <div>
+        <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Audit <span className="text-orange-600">Logs</span></h1>
+        <p className="text-gray-500 mt-2">Real-time tracking of all user and admin actions.</p>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Timestamp</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Action</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Details</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Type</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">Loading logs...</td>
+                </tr>
+              ) : logs.length > 0 ? (
+                logs.map(log => (
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 text-xs text-gray-500 font-mono">
+                      {new Date(log.timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold text-gray-900">{log.userName}</p>
+                      <p className="text-[10px] text-gray-500">{log.userEmail}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-black text-gray-900 uppercase tracking-tight">{log.action}</span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={log.details}>
+                      {log.details}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest",
+                        log.type === 'admin' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                      )}>
+                        {log.type}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">No activity logs found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminSettings = () => {
+  const { user: authUser, profile: adminProfile } = useAuth();
   const [settings, setSettings] = useState({
     defaultCommission: DEFAULT_COMMISSION_RATE * 100,
     minWithdrawal: MIN_WITHDRAWAL_AMOUNT,
@@ -1442,6 +1614,9 @@ const AdminSettings = () => {
         maintenanceMode: settings.maintenanceMode,
         updatedAt: new Date().toISOString(),
       });
+      if (adminProfile) {
+        await logAction(adminProfile.uid, adminProfile.email, adminProfile.displayName, 'UPDATE_SETTINGS', 'Updated global platform settings', 'admin');
+      }
       toast.success('Settings updated successfully');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'settings/global');

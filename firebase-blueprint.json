@@ -94,6 +94,34 @@
         "processedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "amount", "status", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Stores administrative and user activity logs.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "type": { "type": "string", "enum": ["user", "admin"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userEmail", "userName", "action", "details", "type", "timestamp"]
+    },
+    "GlobalSettings": {
+      "title": "Global Settings",
+      "description": "Stores platform-wide configuration parameters.",
+      "type": "object",
+      "properties": {
+        "defaultCommissionRate": { "type": "number" },
+        "minWithdrawalAmount": { "type": "number" },
+        "whatsappAlerts": { "type": "boolean" },
+        "maintenanceMode": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["defaultCommissionRate", "minWithdrawalAmount", "updatedAt"]
     }
   },
   "firestore": {
@@ -101,6 +129,8 @@
     "/products/{productId}": { "schema": "Product", "description": "Product catalog." },
     "/orders/{orderId}": { "schema": "Order", "description": "Customer orders." },
     "/referrals/{referralId}": { "schema": "Referral", "description": "Referral tracking." },
-    "/withdrawals/{withdrawalId}": { "schema": "WithdrawalRequest", "description": "Withdrawal requests." }
+    "/withdrawals/{withdrawalId}": { "schema": "WithdrawalRequest", "description": "Withdrawal requests." },
+    "/audit_logs/{logId}": { "schema": "AuditLog", "description": "System audit logs." },
+    "/settings/global": { "schema": "GlobalSettings", "description": "Global platform settings." }
   }
 }

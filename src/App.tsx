@@ -5,7 +5,6 @@ import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { CartProvider, useCart } from './CartContext';
-import { logout, loginWithGoogle } from './firebase';
 import { cn } from './lib/utils';
 import { CATEGORIES, GOALS, MIN_WITHDRAWAL_AMOUNT } from './constants';
 
@@ -18,10 +17,11 @@ import CheckoutPage from './pages/CheckoutPage';
 import MyCampaignPage from './pages/MyCampaignPage';
 import AdminDashboard from './pages/AdminDashboard';
 import OrderHistoryPage from './pages/OrderHistoryPage';
-import { ProfileCompletionModal } from './components/ProfileCompletionModal';
+import LoginPage from './pages/LoginPage';
+import { LoginModal } from './components/LoginModal';
 
 const Navbar = () => {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, logout, setIsLoginModalOpen } = useAuth();
   const { totalItems } = useCart();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const navigate = useNavigate();
@@ -88,7 +88,7 @@ const Navbar = () => {
               )}
             </Link>
 
-            {user ? (
+            {user && profile ? (
               <div className="flex items-center gap-2">
                 <Link to="/my-campaign" className="hidden sm:flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-orange-100 transition-colors">
                   <Wallet className="w-3.5 h-3.5" />
@@ -97,15 +97,18 @@ const Navbar = () => {
                 <div className="relative group">
                   <button className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden border-2 border-transparent group-hover:border-orange-500 transition-all">
                     <img 
-                      src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-                      alt={user.displayName || 'User'} 
+                      src={`https://ui-avatars.com/api/?name=${profile.displayName}&background=random`} 
+                      alt={profile.displayName || 'User'} 
                       referrerPolicy="no-referrer"
                     />
                   </button>
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all translate-y-2 group-hover:translate-y-0">
                     <div className="px-4 py-2 border-b border-gray-50">
-                      <p className="text-sm font-bold text-gray-900 truncate">{user.displayName}</p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-bold text-gray-900 truncate">{profile.displayName}</p>
+                        {isAdmin && <span className="bg-orange-100 text-orange-600 text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter">Admin</span>}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">{profile.email}</p>
                     </div>
                     <Link to="/orders" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><Package className="w-4 h-4" /> My Orders</Link>
                     <Link to="/my-campaign" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><LayoutDashboard className="w-4 h-4" /> MyCampaign</Link>
@@ -123,7 +126,7 @@ const Navbar = () => {
               </div>
             ) : (
               <button 
-                onClick={loginWithGoogle}
+                onClick={() => setIsLoginModalOpen(true)}
                 className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-gray-800 transition-all active:scale-95"
               >
                 Sign In
@@ -170,10 +173,13 @@ const Navbar = () => {
                   </button>
                 ) : (
                   <button 
-                    onClick={loginWithGoogle}
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsLoginModalOpen(true);
+                    }}
                     className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold"
                   >
-                    Sign In with Google
+                    Sign In
                   </button>
                 )}
               </div>
@@ -227,30 +233,42 @@ const Footer = () => (
   </footer>
 );
 
+const AppContent = () => {
+  const { isLoginModalOpen, setIsLoginModalOpen } = useAuth();
+
+  return (
+    <Router>
+      <div className="min-h-screen flex flex-col bg-white font-sans selection:bg-orange-100 selection:text-orange-900">
+        <Navbar />
+        <main className="flex-grow">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/shop" element={<ProductListingPage />} />
+            <Route path="/product/:id" element={<ProductDetailPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/my-campaign" element={<MyCampaignPage />} />
+            <Route path="/admin/*" element={<AdminDashboard />} />
+            <Route path="/orders" element={<OrderHistoryPage />} />
+            <Route path="/login" element={<LoginPage />} />
+          </Routes>
+        </main>
+        <Footer />
+        <Toaster position="top-center" richColors />
+        <LoginModal 
+          isOpen={isLoginModalOpen} 
+          onClose={() => setIsLoginModalOpen(false)} 
+        />
+      </div>
+    </Router>
+  );
+};
+
 export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <Router>
-          <div className="min-h-screen flex flex-col bg-white font-sans selection:bg-orange-100 selection:text-orange-900">
-            <Navbar />
-            <ProfileCompletionModal />
-            <main className="flex-grow">
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/shop" element={<ProductListingPage />} />
-                <Route path="/product/:id" element={<ProductDetailPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/my-campaign" element={<MyCampaignPage />} />
-                <Route path="/admin/*" element={<AdminDashboard />} />
-                <Route path="/orders" element={<OrderHistoryPage />} />
-              </Routes>
-            </main>
-            <Footer />
-            <Toaster position="top-center" richColors />
-          </div>
-        </Router>
+        <AppContent />
       </CartProvider>
     </AuthProvider>
   );
