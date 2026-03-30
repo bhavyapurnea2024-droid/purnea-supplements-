@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information, wallet balances, and referral settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique user ID from Firebase Auth." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "displayName": { "type": "string", "description": "User's display name." },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User's role." },
+        "couponCode": { "type": "string", "description": "Unique referral coupon code." },
+        "commissionRate": { "type": "number", "description": "User's commission rate (e.g., 0.05)." },
+        "customCommissionRate": { "type": "number", "description": "Override commission rate if set." },
+        "isBlocked": { "type": "boolean", "description": "Whether the user is blocked." },
+        "isCouponDisabled": { "type": "boolean", "description": "Whether the user's coupon is disabled." },
+        "phoneNumber": { "type": "string", "description": "User's phone number." },
+        "isProfileComplete": { "type": "boolean", "description": "Whether the user's profile is complete." },
+        "wallet": {
+          "type": "object",
+          "properties": {
+            "pending": { "type": "number" },
+            "withdrawable": { "type": "number" },
+            "totalEarned": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "couponCode", "commissionRate", "wallet", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Stores supplement product information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "discountPrice": { "type": "number" },
+        "category": { "type": "string" },
+        "brand": { "type": "string" },
+        "goal": { "type": "string", "enum": ["muscle-gain", "fat-loss", "general-health", "performance"] },
+        "stock": { "type": "integer" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "rating": { "type": "number" },
+        "numReviews": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "category", "stock", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Stores customer orders.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "totalAmount": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "couponUsed": { "type": "string" },
+        "referralUserId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "shipped", "delivered", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "shippingAddress": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "totalAmount", "status", "paymentStatus", "shippingAddress", "createdAt", "updatedAt"]
+    },
+    "Referral": {
+      "title": "Referral",
+      "description": "Stores referral commission records.",
+      "type": "object",
+      "properties": {
+        "couponOwnerId": { "type": "string" },
+        "orderId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "earned", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["couponOwnerId", "orderId", "amount", "status", "createdAt"]
+    },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Stores user requests to withdraw earnings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "upiId": { "type": "string" },
+        "bankDetails": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "UserProfile", "description": "User profile data." },
+    "/products/{productId}": { "schema": "Product", "description": "Product catalog." },
+    "/orders/{orderId}": { "schema": "Order", "description": "Customer orders." },
+    "/referrals/{referralId}": { "schema": "Referral", "description": "Referral tracking." },
+    "/withdrawals/{withdrawalId}": { "schema": "WithdrawalRequest", "description": "Withdrawal requests." }
+  }
+}

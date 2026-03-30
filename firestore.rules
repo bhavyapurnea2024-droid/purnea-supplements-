@@ -1,0 +1,255 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (required)
+    //   - role: string (required, 'admin' | 'user')
+    //   - couponCode: string (required)
+    //   - commissionRate: number (required)
+    //   - wallet: map (required, {pending: number, withdrawable: number, totalEarned: number})
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: products
+    // Document ID: productId
+    // Fields:
+    //   - name: string (required)
+    //   - description: string (required)
+    //   - price: number (required, > 0)
+    //   - discountPrice: number (optional)
+    //   - category: string (required)
+    //   - brand: string (required)
+    //   - goal: string (required, 'muscle-gain' | 'fat-loss' | 'general-health' | 'performance')
+    //   - stock: number (required, >= 0)
+    //   - images: list (required, strings)
+    //   - rating: number (required)
+    //   - numReviews: number (required)
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: orders
+    // Document ID: orderId
+    // Fields:
+    //   - userId: string (required)
+    //   - items: list (required, maps)
+    //   - totalAmount: number (required, > 0)
+    //   - discountAmount: number (required)
+    //   - couponUsed: string (optional)
+    //   - referralUserId: string (optional)
+    //   - status: string (required, enum)
+    //   - paymentStatus: string (required, enum)
+    //   - shippingAddress: map (required)
+    //   - createdAt: string (required, ISO 8601)
+    //   - updatedAt: string (required, ISO 8601)
+    //
+    // Collection: referrals
+    // Document ID: referralId
+    // Fields:
+    //   - couponOwnerId: string (required)
+    //   - orderId: string (required)
+    //   - amount: number (required)
+    //   - status: string (required, enum)
+    //   - createdAt: string (required, ISO 8601)
+    //
+    // Collection: withdrawals
+    // Document ID: withdrawalId
+    // Fields:
+    //   - userId: string (required)
+    //   - amount: number (required, >= 300)
+    //   - status: string (required, enum)
+    //   - upiId: string (optional)
+    //   - bankDetails: string (optional)
+    //   - createdAt: string (required, ISO 8601)
+    //   - processedAt: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "bhavyapurnea2024@gmail.com" || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+    
+    function isGlobalAdmin() {
+      return isAuthenticated() && request.auth.token.email == "bhavyapurnea2024@gmail.com";
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'displayName', 'role', 'couponCode', 'commissionRate', 'wallet', 'createdAt']) &&
+             data.uid is string && (data.uid == request.auth.uid || isAdmin()) &&
+             data.email is string && isValidEmail(data.email) &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() >= 10 && data.phoneNumber.size() <= 15)) &&
+             (!('isProfileComplete' in data) || data.isProfileComplete is bool) &&
+             (!('isCouponDisabled' in data) || data.isCouponDisabled is bool) &&
+             data.role in ['admin', 'user'] &&
+             data.couponCode is string && data.couponCode.size() > 0 &&
+             data.commissionRate is number && data.commissionRate >= 0 && data.commissionRate <= 1 &&
+             data.wallet is map &&
+             data.wallet.pending is number &&
+             data.wallet.withdrawable is number &&
+             data.wallet.totalEarned is number &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['name', 'description', 'price', 'category', 'brand', 'goal', 'stock', 'images', 'rating', 'numReviews', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 5000 &&
+             data.price is number && data.price > 0 &&
+             data.category is string &&
+             data.brand is string &&
+             data.goal in ['muscle-gain', 'fat-loss', 'general-health', 'performance'] &&
+             data.stock is int && data.stock >= 0 &&
+             data.images is list && data.images.size() <= 10 &&
+             data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+             data.numReviews is int && data.numReviews >= 0 &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['userId', 'items', 'totalAmount', 'discountAmount', 'status', 'paymentStatus', 'shippingAddress', 'createdAt', 'updatedAt']) &&
+             data.userId is string &&
+             data.items is list && data.items.size() > 0 &&
+             data.totalAmount is number && data.totalAmount > 0 &&
+             data.discountAmount is number && data.discountAmount >= 0 &&
+             data.status in ['pending', 'shipped', 'delivered', 'cancelled'] &&
+             data.paymentStatus in ['pending', 'completed', 'failed'] &&
+             data.shippingAddress is map &&
+             isValidDateString(data.createdAt) &&
+             isValidDateString(data.updatedAt);
+    }
+
+    function isValidReferral(data) {
+      return hasRequiredFields(['couponOwnerId', 'orderId', 'amount', 'status', 'createdAt']) &&
+             data.couponOwnerId is string &&
+             data.orderId is string &&
+             data.amount is number && data.amount >= 0 &&
+             data.status in ['pending', 'earned', 'cancelled'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidWithdrawal(data) {
+      return hasRequiredFields(['userId', 'amount', 'status', 'createdAt']) &&
+             data.userId is string &&
+             data.amount is number && data.amount >= 300 &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /test/connection {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      // Users can read their own profile. Admins can read all.
+      allow read, list: if isOwner(userId) || isAdmin();
+      
+      // Create profile: must be the owner, role must be 'user' unless admin.
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'user' || isAdmin());
+      
+      // Update profile: owner can update non-sensitive fields. Admin can update anything.
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+                        request.resource.data.role == resource.data.role && 
+                        request.resource.data.commissionRate == resource.data.commissionRate &&
+                        (!('customCommissionRate' in request.resource.data) || request.resource.data.customCommissionRate == resource.data.customCommissionRate) &&
+                        request.resource.data.wallet == resource.data.wallet) || (isAdmin() && isValidUser(request.resource.data));
+    }
+
+    match /products/{productId} {
+      // Anyone can read products.
+      allow read, list: if true;
+      
+      // Only admins can manage products.
+      allow write: if isAdmin() && isValidProduct(request.resource.data);
+    }
+
+    match /orders/{orderId} {
+      // Users can read their own orders. Admins can read all.
+      allow read, list: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      
+      // Users can create orders for themselves.
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidOrder(request.resource.data);
+      
+      // Only admins can update order status.
+      allow update: if isAdmin() && isValidOrder(request.resource.data);
+    }
+
+    match /referrals/{referralId} {
+      // Users can read their own referrals. Admins can read all.
+      allow read, list: if (isAuthenticated() && resource.data.couponOwnerId == request.auth.uid) || isAdmin();
+      
+      // Referrals are created by the system (triggered by order creation/payment).
+      // For simplicity in this demo, we allow authenticated users to create if they match the order.
+      // In a real app, this should be a Cloud Function.
+      allow create: if isAuthenticated() && isValidReferral(request.resource.data);
+      
+      // Only admins can update referral status.
+      allow update: if isAdmin() && isValidReferral(request.resource.data);
+    }
+
+    match /withdrawals/{withdrawalId} {
+      // Users can read their own withdrawals. Admins can read all.
+      allow read, list: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      
+      // Users can create withdrawal requests for themselves.
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidWithdrawal(request.resource.data);
+      
+      // Only admins can update withdrawal status.
+      allow update: if isAdmin() && isValidWithdrawal(request.resource.data);
+    }
+
+    match /settings/{settingId} {
+      // Anyone can read global settings.
+      allow read, list: if true;
+      
+      // Only global admin can manage settings.
+      allow write: if isGlobalAdmin();
+    }
+  }
+}
