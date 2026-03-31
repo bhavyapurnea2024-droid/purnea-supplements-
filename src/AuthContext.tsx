@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType, logout } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { UserProfile } from './types';
-import { DEFAULT_COMMISSION_RATE } from './constants';
+import { DEFAULT_COMMISSION_RATE, DEFAULT_DISCOUNT_RATE } from './constants';
 
 interface AuthContextType {
   user: User | null;
@@ -62,6 +62,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: (email === 'piyushpurnea15@gmail.com' || email === 'bhavyapurnea2024@gmail.com') ? 'admin' : 'user',
         couponCode: (name.split(' ')[0].toUpperCase() || 'USER') + Math.floor(1000 + Math.random() * 9000),
         commissionRate: DEFAULT_COMMISSION_RATE,
+        customCommissionRate: DEFAULT_COMMISSION_RATE,
+        customDiscountRate: DEFAULT_DISCOUNT_RATE,
+        isCouponDisabled: false,
         wallet: {
           pending: 0,
           withdrawable: 0,

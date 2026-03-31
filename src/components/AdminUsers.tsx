@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { X, TrendingUp, RefreshCw, Shield, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { DEFAULT_COMMISSION_RATE, DEFAULT_DISCOUNT_RATE } from '../constants';
 
 const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -32,9 +33,10 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
   }, [user.couponCode]);
 
   const toggleCouponStatus = async () => {
+    const currentStatus = user.isCouponDisabled || false;
     try {
-      await updateDoc(doc(db, 'users', user.uid), { isCouponDisabled: !user.isCouponDisabled });
-      toast.success(user.isCouponDisabled ? 'Coupon enabled' : 'Coupon disabled');
+      await updateDoc(doc(db, 'users', user.uid), { isCouponDisabled: !currentStatus });
+      toast.success(!currentStatus ? 'Coupon disabled' : 'Coupon enabled');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     }
@@ -201,12 +203,12 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
                       min="0" 
                       max="50" 
                       step="1"
-                      value={Math.round((user.customCommissionRate !== undefined ? user.customCommissionRate : 0.05) * 100)}
+                      value={Math.round((user.customCommissionRate !== undefined ? user.customCommissionRate : DEFAULT_COMMISSION_RATE) * 100)}
                       onChange={(e) => updateCommission(Number(e.target.value) / 100)}
                       className="flex-grow h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-orange-600"
                     />
                     <div className="w-16 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-center">
-                      <span className="text-sm font-black text-gray-900">{Math.round((user.customCommissionRate !== undefined ? user.customCommissionRate : 0.05) * 100)}%</span>
+                      <span className="text-sm font-black text-gray-900">{Math.round((user.customCommissionRate !== undefined ? user.customCommissionRate : DEFAULT_COMMISSION_RATE) * 100)}%</span>
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-400 mt-2 italic">
@@ -222,12 +224,12 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
                       min="0" 
                       max="50" 
                       step="1"
-                      value={Math.round((user.customDiscountRate !== undefined ? user.customDiscountRate : 0.10) * 100)}
+                      value={Math.round((user.customDiscountRate !== undefined ? user.customDiscountRate : DEFAULT_DISCOUNT_RATE) * 100)}
                       onChange={(e) => updateDiscount(Number(e.target.value) / 100)}
                       className="flex-grow h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-green-600"
                     />
                     <div className="w-16 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-center">
-                      <span className="text-sm font-black text-gray-900">{Math.round((user.customDiscountRate !== undefined ? user.customDiscountRate : 0.10) * 100)}%</span>
+                      <span className="text-sm font-black text-gray-900">{Math.round((user.customDiscountRate !== undefined ? user.customDiscountRate : DEFAULT_DISCOUNT_RATE) * 100)}%</span>
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-400 mt-2 italic">
@@ -366,7 +368,12 @@ const AdminUsers = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm font-black text-orange-600 tracking-widest">{user.couponCode}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-orange-600 tracking-widest">{user.couponCode}</span>
+                      {user.isCouponDisabled && (
+                        <span className="text-[8px] font-black text-red-600 uppercase tracking-widest">Disabled</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-sm font-black text-gray-900">₹{user.wallet.withdrawable.toFixed(2)}</p>

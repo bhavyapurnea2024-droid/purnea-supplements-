@@ -9,8 +9,8 @@ import { cn } from '../lib/utils';
 const AdminSettings = () => {
   const { profile: adminProfile } = useAuth();
   const [settings, setSettings] = useState({
-    defaultCommission: 10,
-    defaultDiscount: 10,
+    defaultCommission: 5,
+    defaultDiscount: 5,
     minWithdrawal: 500,
     whatsappAlerts: true,
     maintenanceMode: false,
@@ -22,8 +22,8 @@ const AdminSettings = () => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setSettings({
-          defaultCommission: (data.defaultCommissionRate || 0.1) * 100,
-          defaultDiscount: (data.defaultDiscountRate || 0.1) * 100,
+          defaultCommission: (data.defaultCommissionRate || 0.05) * 100,
+          defaultDiscount: (data.defaultDiscountRate || 0.05) * 100,
           minWithdrawal: data.minWithdrawalAmount || 500,
           whatsappAlerts: data.whatsappAlerts ?? true,
           maintenanceMode: data.maintenanceMode ?? false,

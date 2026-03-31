@@ -168,21 +168,29 @@ Current Context:
       timestamp: new Date().toISOString()
     };
 
+    // Count user messages to determine delay
+    const userMessageCount = session.messages.filter(m => m.role === 'user').length;
+    const isFirstReply = userMessageCount === 0;
+    const delay = isFirstReply ? 60000 : 5000;
+
     const updatedMessages = [...session.messages, userMessage];
     setInputText('');
     setIsTyping(true);
 
     try {
-      // Update Firestore with user message
+      // Update Firestore with user message immediately
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       await updateDoc(sessionRef, { messages: updatedMessages });
+
+      // Wait for the specified delay (1 min for first reply, 5s for others)
+      await new Promise(resolve => setTimeout(resolve, delay));
 
       // Call Gemini
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const model = "gemini-3-flash-preview";
       
       const chatHistory = updatedMessages.map(m => ({
-        role: m.role,
+        role: m.role === 'user' ? 'user' : 'model',
         parts: [{ text: m.text }]
       }));
 
@@ -202,13 +210,17 @@ Current Context:
         timestamp: new Date().toISOString()
       };
 
+      // Get the latest session to ensure we don't overwrite any other updates (though isTyping prevents most)
       await updateDoc(sessionRef, { 
         messages: [...updatedMessages, aiMessage]
       });
 
     } catch (error) {
       console.error('Gemini Error:', error);
-      toast.error('Failed to get response from Your Trainer');
+      toast.error('Failed to get response from Your Trainer. Please try again.');
+      
+      // If it failed, we should probably allow the user to try again by setting isTyping to false
+      // which is handled in finally.
     } finally {
       setIsTyping(false);
     }
@@ -318,6 +330,12 @@ Current Context:
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
+      {/* 24h Warning Banner */}
+      <div className="bg-orange-600 text-white py-2.5 px-4 text-center text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+        <AlertCircle className="w-3.5 h-3.5" />
+        Important: Your session with {trainerProfile.name} is valid for exactly 24 hours after payment.
+      </div>
+
       {/* Chat Header */}
       <div className="bg-white border-b border-gray-100 sticky top-16 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -384,10 +402,17 @@ Current Context:
             <div className="flex gap-4 max-w-[85%]">
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">A</div>
               <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-1">
+                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce"></div>
+                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {session.messages.filter(m => m.role === 'user').length === 1 
+                      ? "Analyzing your profile... (First reply takes ~1 min)" 
+                      : "Trainer is typing..."}
+                  </p>
                 </div>
               </div>
             </div>

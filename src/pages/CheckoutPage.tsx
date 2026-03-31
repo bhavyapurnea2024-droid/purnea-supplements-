@@ -9,7 +9,7 @@ import { ChevronRight, ShieldCheck, CreditCard, Truck, CheckCircle2, AlertCircle
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Order, UserProfile } from '../types';
-import { DEFAULT_DISCOUNT_RATE, WHATSAPP_NUMBER } from '../constants';
+import { DEFAULT_DISCOUNT_RATE, DEFAULT_COMMISSION_RATE, WHATSAPP_NUMBER } from '../constants';
 
 const DELIVERY_CHARGE = 40;
 
@@ -75,8 +75,8 @@ const CheckoutPage = () => {
           toast.error('You cannot use your own coupon code');
           setAppliedCoupon(null);
         } else {
-          const commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05;
-          const discountRate = couponOwner.customDiscountRate || globalSettings?.defaultDiscountRate || 0.10;
+          const commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || DEFAULT_COMMISSION_RATE;
+          const discountRate = couponOwner.customDiscountRate || globalSettings?.defaultDiscountRate || DEFAULT_DISCOUNT_RATE;
           const discount = subtotal * discountRate;
           setAppliedCoupon({
             code: couponCode.toUpperCase(),
