@@ -34,26 +34,72 @@ const AdminOrders = () => {
       await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'UPDATE_ORDER_STATUS', `Updated order #${orderId.slice(-6)} status to ${status}`, 'admin');
       toast.success(`Order status updated to ${status}`);
 
-      // Logic for commission maturity (removed as it's now immediate)
-      
-      // Logic for cancellation
-      if (status === 'cancelled' && oldStatus !== 'cancelled' && orderData.referralUserId) {
+      // Logic for commission maturity
+      if (orderData.referralUserId) {
         const q = query(
           collection(db, 'referrals'), 
-          where('orderId', '==', orderId),
-          where('status', '==', 'earned')
+          where('orderId', '==', orderId)
         );
         const refSnapshot = await getDocs(q);
+        
         if (!refSnapshot.empty) {
           const refDoc = refSnapshot.docs[0];
           const refData = refDoc.data() as Referral;
-          await updateDoc(doc(db, 'referrals', refDoc.id), { status: 'cancelled' });
           const userRef = doc(db, 'users', orderData.referralUserId);
-          await updateDoc(userRef, {
-            'wallet.withdrawable': increment(-refData.amount),
-            'wallet.totalEarned': increment(-refData.amount),
-          });
-          toast.info('Referral commission reversed');
+
+          // If marked DELIVERED: move from pending to earned with 12h maturity
+          if (status === 'delivered' && oldStatus !== 'delivered') {
+            if (refData.status === 'pending') {
+              const maturesAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+              await updateDoc(doc(db, 'referrals', refDoc.id), { 
+                status: 'earned',
+                maturesAt: maturesAt
+              });
+              await updateDoc(userRef, {
+                'wallet.pending': increment(-refData.amount),
+              });
+              toast.success('Commission earned! It will be withdrawable in 12 hours.');
+            }
+          }
+          
+          // If moved OUT of delivered: move back to pending
+          else if (status !== 'delivered' && oldStatus === 'delivered') {
+            if (refData.status === 'earned') {
+              await updateDoc(doc(db, 'referrals', refDoc.id), { 
+                status: 'pending',
+                maturesAt: null
+              });
+              await updateDoc(userRef, {
+                'wallet.pending': increment(refData.amount),
+              });
+              toast.info('Commission moved back to pending');
+            }
+          }
+
+          // If CANCELLED: remove from whatever balance it was in
+          else if (status === 'cancelled' && oldStatus !== 'cancelled') {
+            if (refData.status === 'pending') {
+              await updateDoc(doc(db, 'referrals', refDoc.id), { status: 'cancelled' });
+              await updateDoc(userRef, {
+                'wallet.pending': increment(-refData.amount),
+                'wallet.totalEarned': increment(-refData.amount),
+              });
+              toast.info('Pending commission cancelled');
+            } else if (refData.status === 'earned') {
+              await updateDoc(doc(db, 'referrals', refDoc.id), { status: 'cancelled' });
+              await updateDoc(userRef, {
+                'wallet.totalEarned': increment(-refData.amount),
+              });
+              toast.info('Maturing commission cancelled');
+            } else if (refData.status === 'matured') {
+              await updateDoc(doc(db, 'referrals', refDoc.id), { status: 'cancelled' });
+              await updateDoc(userRef, {
+                'wallet.withdrawable': increment(-refData.amount),
+                'wallet.totalEarned': increment(-refData.amount),
+              });
+              toast.info('Matured commission reversed');
+            }
+          }
         }
       }
     } catch (error) {

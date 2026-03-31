@@ -17,8 +17,15 @@ const MyCampaignPage = () => {
   const [loading, setLoading] = useState(true);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState(300);
-  const [upiId, setUpiId] = useState('');
+  const [upiId, setUpiId] = useState(profile?.upiId || '');
   const [globalSettings, setGlobalSettings] = useState<any>(null);
+  const [claiming, setClaiming] = useState(false);
+
+  useEffect(() => {
+    if (profile?.upiId) {
+      setUpiId(profile.upiId);
+    }
+  }, [profile?.upiId]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'global'), (snapshot) => {
@@ -87,19 +94,22 @@ const MyCampaignPage = () => {
 
     setLoading(true);
     try {
+      const visibleAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
       await addDoc(collection(db, 'withdrawals'), {
         userId: user.uid,
         amount: withdrawAmount,
         status: 'pending',
         upiId,
+        visibleAt,
         createdAt: new Date().toISOString(),
       });
-      await logAction(user.uid, user.email || '', user.displayName || '', 'WITHDRAW_REQUEST', `Requested withdrawal of ₹${withdrawAmount} via UPI: ${upiId}`, 'user');
+      await logAction(user.uid, user.email || '', user.displayName || '', 'WITHDRAW_REQUEST', `Requested withdrawal of ₹${withdrawAmount} via UPI: ${upiId} (Visible in 12h)`, 'user');
 
-      // Deduct from withdrawable balance
+      // Deduct from withdrawable balance and save UPI ID
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         'wallet.withdrawable': increment(-withdrawAmount),
+        upiId: upiId,
       });
 
       toast.success('Withdrawal request submitted successfully!');
@@ -108,6 +118,42 @@ const MyCampaignPage = () => {
       handleFirestoreError(error, OperationType.CREATE, 'withdrawals');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClaimCommissions = async () => {
+    if (!user || !profile) return;
+    const maturedReferrals = referrals.filter(ref => 
+      ref.status === 'earned' && 
+      ref.maturesAt && 
+      new Date(ref.maturesAt) <= new Date()
+    );
+
+    if (maturedReferrals.length === 0) {
+      toast.info('No matured commissions to claim yet.');
+      return;
+    }
+
+    setClaiming(true);
+    try {
+      const totalToClaim = maturedReferrals.reduce((sum, ref) => sum + ref.amount, 0);
+      
+      // Update each referral status
+      for (const ref of maturedReferrals) {
+        await updateDoc(doc(db, 'referrals', ref.id), { status: 'matured' });
+      }
+
+      // Update user wallet
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        'wallet.withdrawable': increment(totalToClaim),
+      });
+
+      toast.success(`₹${totalToClaim.toFixed(2)} moved to withdrawable balance!`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'referrals-claim');
+    } finally {
+      setClaiming(false);
     }
   };
 
@@ -144,16 +190,25 @@ const MyCampaignPage = () => {
             <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase leading-none">MyCampaign <span className="text-orange-600">Dashboard</span></h1>
             <p className="text-gray-500 mt-2">Track your referrals, earnings, and withdrawals.</p>
           </div>
-          <button 
-            onClick={() => setIsWithdrawModalOpen(true)}
-            className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 flex items-center gap-2"
-          >
-            <CreditCard className="w-5 h-5" /> Withdraw Earnings
-          </button>
+          <div className="flex gap-4">
+            <button 
+              onClick={handleClaimCommissions}
+              disabled={claiming || referrals.filter(ref => ref.status === 'earned' && ref.maturesAt && new Date(ref.maturesAt) <= new Date()).length === 0}
+              className="bg-green-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-green-700 shadow-xl shadow-green-600/20 transition-all active:scale-95 flex items-center gap-2 disabled:bg-gray-200 disabled:shadow-none"
+            >
+              <CheckCircle2 className="w-5 h-5" /> {claiming ? 'Claiming...' : 'Claim Matured'}
+            </button>
+            <button 
+              onClick={() => setIsWithdrawModalOpen(true)}
+              className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 flex items-center gap-2"
+            >
+              <CreditCard className="w-5 h-5" /> Withdraw Earnings
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 mb-6">
               <Wallet className="w-6 h-6" />
@@ -167,6 +222,14 @@ const MyCampaignPage = () => {
             </div>
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Pending</p>
             <h3 className="text-3xl font-black text-gray-900 tracking-tight">₹{profile?.wallet?.pending.toFixed(2)}</h3>
+          </div>
+          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+            <div className="w-12 h-12 bg-yellow-50 rounded-2xl flex items-center justify-center text-yellow-600 mb-6">
+              <Clock className="w-6 h-6" />
+            </div>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Maturing</p>
+            <h3 className="text-3xl font-black text-gray-900 tracking-tight">₹{referrals.filter(ref => ref.status === 'earned').reduce((sum, ref) => sum + ref.amount, 0).toFixed(2)}</h3>
+            <p className="text-[8px] text-gray-400 mt-1 uppercase font-bold">Available in 12h</p>
           </div>
           <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 mb-6">
@@ -219,10 +282,11 @@ const MyCampaignPage = () => {
                             <td className="px-6 py-4">
                               <span className={cn(
                                 "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-                                ref.status === 'earned' ? "bg-green-100 text-green-700" : 
+                                ref.status === 'matured' ? "bg-green-100 text-green-700" : 
+                                ref.status === 'earned' ? "bg-yellow-100 text-yellow-700" : 
                                 ref.status === 'pending' ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
                               )}>
-                                {ref.status}
+                                {ref.status === 'earned' ? 'maturing' : ref.status}
                               </span>
                             </td>
                           </tr>
@@ -402,6 +466,9 @@ const MyCampaignPage = () => {
                       onChange={(e) => setUpiId(e.target.value)}
                       className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20"
                     />
+                    <p className="text-[10px] text-orange-600 mt-2 font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> Request will be visible to admin in 12 hours
+                    </p>
                   </div>
 
                   <button 

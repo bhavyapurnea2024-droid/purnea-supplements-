@@ -15,6 +15,7 @@ export interface UserProfile {
   isBlocked?: boolean;
   isCouponDisabled?: boolean;
   password?: string;
+  upiId?: string;
   wallet: {
     pending: number;
     withdrawable: number;
@@ -82,7 +83,8 @@ export interface Referral {
   amount: number;
   orderTotal?: number;
   customerName?: string;
-  status: 'pending' | 'earned' | 'cancelled';
+  status: 'pending' | 'earned' | 'matured' | 'cancelled';
+  maturesAt?: string;
   createdAt: string;
 }
 
@@ -93,6 +95,7 @@ export interface WithdrawalRequest {
   status: 'pending' | 'approved' | 'rejected';
   upiId?: string;
   bankDetails?: string;
+  visibleAt?: string;
   createdAt: string;
   processedAt?: string;
 }

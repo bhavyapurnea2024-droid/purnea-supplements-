@@ -13,7 +13,10 @@ const AdminWithdrawals = () => {
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'withdrawals'), orderBy('createdAt', 'desc')), (snapshot) => {
-      setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest)));
+      const allWithdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest));
+      // Only show requests that are visible (12h delay)
+      const visibleWithdrawals = allWithdrawals.filter(w => !w.visibleAt || new Date(w.visibleAt) <= new Date());
+      setWithdrawals(visibleWithdrawals);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'withdrawals');
     });

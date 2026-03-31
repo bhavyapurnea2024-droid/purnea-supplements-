@@ -91,6 +91,15 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
     }
   };
 
+  const updateWalletBalance = async (field: string, value: number) => {
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { [`wallet.${field}`]: value });
+      toast.success(`Wallet ${field} updated to ₹${value.toFixed(2)}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div 
@@ -139,6 +148,42 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
             <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Total Orders</p>
               <h4 className="text-2xl font-black text-orange-600">{orders.length}</h4>
+            </div>
+          </div>
+
+          {/* Wallet Management */}
+          <div className="space-y-6">
+            <h5 className="text-xs font-black text-gray-400 uppercase tracking-widest">Wallet Balance Management</h5>
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { label: 'Pending', field: 'pending', color: 'text-blue-600' },
+                { label: 'Withdrawable', field: 'withdrawable', color: 'text-green-600' },
+                { label: 'Total Earned', field: 'totalEarned', color: 'text-gray-900' },
+              ].map((item) => (
+                <div key={item.field} className="space-y-4">
+                  <p className="text-sm font-bold text-gray-900">{item.label} Balance</p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-grow">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₹</span>
+                      <input 
+                        type="number"
+                        defaultValue={(user.wallet as any)[item.field]}
+                        onBlur={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val !== (user.wallet as any)[item.field]) {
+                            updateWalletBalance(item.field, val);
+                          }
+                        }}
+                        className={cn(
+                          "w-full bg-gray-50 border-none rounded-xl pl-8 pr-4 py-3 text-sm font-black focus:ring-2 ring-orange-500/20",
+                          item.color
+                        )}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-400 italic">Edit and click outside to save</p>
+                </div>
+              ))}
             </div>
           </div>
 

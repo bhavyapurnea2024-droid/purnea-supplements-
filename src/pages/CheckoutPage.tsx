@@ -139,13 +139,13 @@ const CheckoutPage = () => {
               amount: commissionAmount,
               orderTotal: totalAmount,
               customerName: address.fullName,
-              status: 'earned',
+              status: 'pending',
               createdAt: new Date().toISOString(),
             });
 
             const userRef = doc(db, 'users', appliedCoupon.userId);
             await updateDoc(userRef, {
-              'wallet.withdrawable': increment(commissionAmount),
+              'wallet.pending': increment(commissionAmount),
               'wallet.totalEarned': increment(commissionAmount),
             });
           }
@@ -224,13 +224,13 @@ const CheckoutPage = () => {
           amount: commissionAmount,
           orderTotal: totalAmount,
           customerName: address.fullName,
-          status: 'earned',
+          status: 'pending',
           createdAt: new Date().toISOString(),
         });
 
         const userRef = doc(db, 'users', appliedCoupon.userId);
         await updateDoc(userRef, {
-          'wallet.withdrawable': increment(commissionAmount),
+          'wallet.pending': increment(commissionAmount),
           'wallet.totalEarned': increment(commissionAmount),
         });
       }
