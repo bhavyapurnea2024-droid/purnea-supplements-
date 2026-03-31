@@ -226,7 +226,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     <span className="text-xs font-bold text-gray-500 group-hover:text-gray-700 transition-colors">Remember Me</span>
                   </label>
                   {!isSignUp && (
-                    <button type="button" className="text-xs font-bold text-orange-600 hover:underline">Forgot Password?</button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const message = `Hello, I forgot my password. My details are:\nEmail: ${formData.email || 'Not provided'}\nName: ${formData.name || 'Not provided'}`;
+                        window.open(`https://wa.me/919508210352?text=${encodeURIComponent(message)}`, '_blank');
+                      }}
+                      className="text-xs font-bold text-orange-600 hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
                   )}
                 </div>
 

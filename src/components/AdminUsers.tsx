@@ -292,6 +292,7 @@ const AdminUsers = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc')), (snapshot) => {
@@ -324,13 +325,31 @@ const AdminUsers = () => {
     }
   };
 
+  const filteredUsers = users.filter(user => 
+    user.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.phoneNumber && user.phoneNumber.includes(searchQuery))
+  );
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
     <div className="space-y-12">
-      <div>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Manage <span className="text-orange-600">Users</span></h1>
-        <p className="text-gray-500 mt-2">View and manage user accounts and referral campaigns.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Manage <span className="text-orange-600">Users</span></h1>
+          <p className="text-gray-500 mt-2">View and manage user accounts and referral campaigns.</p>
+        </div>
+        
+        <div className="relative w-full md:w-80">
+          <input
+            type="text"
+            placeholder="Search by name, email or phone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-4 pr-4 py-3 bg-white border-2 border-gray-100 rounded-2xl focus:border-orange-500/20 focus:ring-0 transition-all font-bold text-sm"
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
@@ -340,13 +359,14 @@ const AdminUsers = () => {
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Role</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Password</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Coupon</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Wallet</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {users.map(user => (
+              {filteredUsers.map(user => (
                 <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
@@ -366,6 +386,11 @@ const AdminUsers = () => {
                     )}>
                       {user.role}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-mono font-bold text-gray-600 bg-gray-50 px-2 py-1 rounded-lg inline-block">
+                      {user.password || 'N/A'}
+                    </p>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">

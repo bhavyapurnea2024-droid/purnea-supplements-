@@ -58,8 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: email,
         displayName: name,
         phoneNumber: phone,
+        password: password,
         isProfileComplete: true,
-        role: (email === 'piyushpurnea15@gmail.com' || email === 'bhavyapurnea2024@gmail.com') ? 'admin' : 'user',
+        role: (email === 'piyushpurnea15@gmail.com') ? 'admin' : 'user',
         couponCode: (name.split(' ')[0].toUpperCase() || 'USER') + Math.floor(1000 + Math.random() * 9000),
         commissionRate: DEFAULT_COMMISSION_RATE,
         customCommissionRate: DEFAULT_COMMISSION_RATE,
@@ -129,10 +130,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const isAdmin = profile?.role === 'admin' || profile?.email === 'piyushpurnea15@gmail.com' || profile?.email === 'bhavyapurnea2024@gmail.com';
+  const isAdmin = profile?.role === 'admin' || profile?.email === 'piyushpurnea15@gmail.com';
 
   useEffect(() => {
-    if ((profile?.email === 'piyushpurnea15@gmail.com' || profile?.email === 'bhavyapurnea2024@gmail.com') && profile.role !== 'admin') {
+    if ((profile?.email === 'piyushpurnea15@gmail.com') && profile.role !== 'admin') {
       const userDocRef = doc(db, 'users', profile.uid);
       updateDoc(userDocRef, { role: 'admin' }).catch(error => {
         handleFirestoreError(error, OperationType.UPDATE, `users/${profile.uid}`);

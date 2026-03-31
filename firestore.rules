@@ -98,7 +98,6 @@ service cloud.firestore {
       return isAuthenticated() &&
         (request.auth.uid == "DPxuopbYhnO9aL4CWL2ry5uS6Iw1" ||
          request.auth.token.email == "piyushpurnea15@gmail.com" || 
-         (request.auth.token.email == "bhavyapurnea2024@gmail.com" && request.auth.token.email_verified == true) ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
@@ -106,8 +105,7 @@ service cloud.firestore {
     function isGlobalAdmin() {
       return isAuthenticated() && 
         (request.auth.uid == "DPxuopbYhnO9aL4CWL2ry5uS6Iw1" ||
-         request.auth.token.email == "piyushpurnea15@gmail.com" || 
-         (request.auth.token.email == "bhavyapurnea2024@gmail.com" && request.auth.token.email_verified == true));
+         request.auth.token.email == "piyushpurnea15@gmail.com");
     }
 
     function hasRequiredFields(fields) {
