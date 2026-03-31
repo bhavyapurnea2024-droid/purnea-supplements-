@@ -186,8 +186,13 @@ Current Context:
       await new Promise(resolve => setTimeout(resolve, delay));
 
       // Call Gemini
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const model = "gemini-3-flash-preview";
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Gemini API Key is missing. Please check your environment settings.');
+      }
+      
+      const ai = new GoogleGenAI({ apiKey });
+      const model = "gemini-flash-latest";
       
       const chatHistory = updatedMessages.map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
@@ -217,10 +222,8 @@ Current Context:
 
     } catch (error) {
       console.error('Gemini Error:', error);
-      toast.error('Failed to get response from Your Trainer. Please try again.');
-      
-      // If it failed, we should probably allow the user to try again by setting isTyping to false
-      // which is handled in finally.
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to get response: ${errorMessage}. Please try again.`);
     } finally {
       setIsTyping(false);
     }
