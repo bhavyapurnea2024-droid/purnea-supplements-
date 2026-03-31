@@ -202,15 +202,19 @@ const MyCampaignPage = () => {
                         <tr className="bg-gray-50 border-b border-gray-100">
                           <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Date</th>
                           <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Order ID</th>
-                          <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
+                          <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Customer</th>
+                          <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Order Total</th>
+                          <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Commission</th>
                           <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {referrals.map(ref => (
-                          <tr key={ref.id} className="hover:bg-gray-50 transition-colors">
+                          <tr key={ref.id} className="hover:bg-gray-50 transition-colors group">
                             <td className="px-6 py-4 text-sm text-gray-600">{new Date(ref.createdAt).toLocaleDateString()}</td>
                             <td className="px-6 py-4 text-sm font-bold text-gray-900">#{ref.orderId.slice(-6).toUpperCase()}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 font-medium">{ref.customerName || 'N/A'}</td>
+                            <td className="px-6 py-4 text-sm font-bold text-gray-900">₹{ref.orderTotal?.toFixed(2) || '0.00'}</td>
                             <td className="px-6 py-4 text-sm font-black text-orange-600">₹{ref.amount.toFixed(2)}</td>
                             <td className="px-6 py-4">
                               <span className={cn(

@@ -4,12 +4,14 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  photoURL?: string;
   phoneNumber?: string;
   isProfileComplete?: boolean;
   role: UserRole;
   couponCode: string;
   commissionRate: number; // Default commission rate for this user
   customCommissionRate?: number; // Override commission rate if set
+  customDiscountRate?: number; // Override discount rate for users using this coupon
   isBlocked?: boolean;
   isCouponDisabled?: boolean;
   wallet: {
@@ -55,10 +57,11 @@ export interface Order {
   totalAmount: number;
   discountAmount: number;
   referralAmount?: number; // Commission amount generated for the referrer
-  couponUsed?: string;
-  referralUserId?: string;
+  couponUsed?: string | null;
+  referralUserId?: string | null;
   status: OrderStatus;
   paymentStatus: 'pending' | 'completed' | 'failed';
+  paymentId?: string;
   shippingAddress: {
     fullName: string;
     addressLine1: string;
@@ -76,6 +79,8 @@ export interface Referral {
   couponOwnerId: string;
   orderId: string;
   amount: number;
+  orderTotal?: number;
+  customerName?: string;
   status: 'pending' | 'earned' | 'cancelled';
   createdAt: string;
 }

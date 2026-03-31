@@ -11,6 +11,8 @@ import { cn } from '../lib/utils';
 import { Order, UserProfile } from '../types';
 import { DEFAULT_DISCOUNT_RATE, WHATSAPP_NUMBER } from '../constants';
 
+const DELIVERY_CHARGE = 40;
+
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
   const { user, profile } = useAuth();
@@ -74,7 +76,7 @@ const CheckoutPage = () => {
           setAppliedCoupon(null);
         } else {
           const commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05;
-          const discountRate = DEFAULT_DISCOUNT_RATE; // 10% for friend
+          const discountRate = couponOwner.customDiscountRate || globalSettings?.defaultDiscountRate || 0.10;
           const discount = subtotal * discountRate;
           setAppliedCoupon({
             code: couponCode.toUpperCase(),
@@ -94,13 +96,106 @@ const CheckoutPage = () => {
 
   const handlePlaceOrder = async () => {
     if (!user) return;
+    
+    const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
+
+    // Razorpay Dummy Integration
+    const options = {
+      key: "rzp_test_dummykey", // Dummy Key
+      amount: totalAmount * 100, // Amount in paise
+      currency: "INR",
+      name: "Purnea Supplements",
+      description: "Order Payment",
+      image: "https://ui-avatars.com/api/?name=P&background=ea580c&color=fff",
+      handler: async function (response: any) {
+        // Payment successful
+        setLoading(true);
+        setPaymentStep('processing');
+        
+        try {
+          const orderData: Omit<Order, 'id'> = {
+            userId: user.uid,
+            items,
+            totalAmount,
+            discountAmount: appliedCoupon?.discount || 0,
+            couponUsed: appliedCoupon?.code || null,
+            referralUserId: appliedCoupon?.userId || null,
+            status: 'pending',
+            paymentStatus: 'completed',
+            paymentId: response.razorpay_payment_id || 'dummy_payment_id',
+            shippingAddress: address,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          const orderRef = await addDoc(collection(db, 'orders'), orderData);
+          await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount}`, 'user');
+          
+          if (appliedCoupon) {
+            const commissionAmount = subtotal * appliedCoupon.commissionRate;
+            await addDoc(collection(db, 'referrals'), {
+              couponOwnerId: appliedCoupon.userId,
+              orderId: orderRef.id,
+              amount: commissionAmount,
+              orderTotal: totalAmount,
+              customerName: address.fullName,
+              status: 'earned',
+              createdAt: new Date().toISOString(),
+            });
+
+            const userRef = doc(db, 'users', appliedCoupon.userId);
+            await updateDoc(userRef, {
+              'wallet.withdrawable': increment(commissionAmount),
+              'wallet.totalEarned': increment(commissionAmount),
+            });
+          }
+
+          setPaymentStep('success');
+          toast.success('Payment Successful & Order Placed!');
+          
+          const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+          const whatsappMessage = `*New Order Received!*%0A%0A` +
+            `*Order ID:* %23${orderRef.id.slice(-6).toUpperCase()}%0A` +
+            `*Customer:* ${address.fullName}%0A` +
+            `*Phone:* ${address.phone}%0A` +
+            `*Total:* ₹${totalAmount}%0A` +
+            `*Items:* ${itemsList}%0A` +
+            `*Address:* ${address.addressLine1}, ${address.city}, ${address.state} - ${address.zipCode}%0A%0A` +
+            `_Please process this order as soon as possible._`;
+
+          const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
+          window.open(whatsappUrl, '_blank');
+          
+          setTimeout(() => {
+            clearCart();
+          }, 1000);
+        } catch (error) {
+          setPaymentStep('selection');
+          handleFirestoreError(error, OperationType.CREATE, 'orders');
+        } finally {
+          setLoading(false);
+        }
+      },
+      prefill: {
+        name: address.fullName,
+        email: user.email,
+        contact: address.phone
+      },
+      theme: {
+        color: "#ea580c"
+      }
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
+  };
+
+  const handleMockPayment = async () => {
+    if (!user) return;
     setLoading(true);
     setPaymentStep('processing');
     
-    const totalAmount = subtotal - (appliedCoupon?.discount || 0);
-    
-    // Simulate payment gateway delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
 
     try {
       const orderData: Omit<Order, 'id'> = {
@@ -108,32 +203,31 @@ const CheckoutPage = () => {
         items,
         totalAmount,
         discountAmount: appliedCoupon?.discount || 0,
-        couponUsed: appliedCoupon?.code,
-        referralUserId: appliedCoupon?.userId,
+        couponUsed: appliedCoupon?.code || null,
+        referralUserId: appliedCoupon?.userId || null,
         status: 'pending',
-        paymentStatus: 'completed', // Mocking successful payment
+        paymentStatus: 'completed',
+        paymentId: 'mock_payment_' + Math.random().toString(36).substr(2, 9),
         shippingAddress: address,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
-      await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount}`, 'user');
+      await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount} (Mock Payment)`, 'user');
       
-      // If referral used, update referral user's wallet instantly
       if (appliedCoupon) {
         const commissionAmount = subtotal * appliedCoupon.commissionRate;
-        
-        // Create referral record
         await addDoc(collection(db, 'referrals'), {
           couponOwnerId: appliedCoupon.userId,
           orderId: orderRef.id,
           amount: commissionAmount,
-          status: 'earned', // Set to earned instantly as requested
+          orderTotal: totalAmount,
+          customerName: address.fullName,
+          status: 'earned',
           createdAt: new Date().toISOString(),
         });
 
-        // Update user wallet instantly to withdrawable
         const userRef = doc(db, 'users', appliedCoupon.userId);
         await updateDoc(userRef, {
           'wallet.withdrawable': increment(commissionAmount),
@@ -142,11 +236,10 @@ const CheckoutPage = () => {
       }
 
       setPaymentStep('success');
-      toast.success('Payment Successful & Order Placed!');
+      toast.success('Mock Payment Successful & Order Placed!');
       
-      // Generate WhatsApp message for the admin
       const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
-      const whatsappMessage = `*New Order Received!*%0A%0A` +
+      const whatsappMessage = `*New Order Received (MOCK)!*%0A%0A` +
         `*Order ID:* %23${orderRef.id.slice(-6).toUpperCase()}%0A` +
         `*Customer:* ${address.fullName}%0A` +
         `*Phone:* ${address.phone}%0A` +
@@ -156,8 +249,6 @@ const CheckoutPage = () => {
         `_Please process this order as soon as possible._`;
 
       const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
-      
-      // Open WhatsApp to notify admin
       window.open(whatsappUrl, '_blank');
       
       setTimeout(() => {
@@ -171,7 +262,7 @@ const CheckoutPage = () => {
     }
   };
 
-  const finalTotal = subtotal - (appliedCoupon?.discount || 0);
+  const finalTotal = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">
@@ -184,7 +275,7 @@ const CheckoutPage = () => {
           </div>
           <div className="flex items-center gap-2 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
             <ShieldCheck className="w-3 h-3" />
-            Test Mode Active
+            Razorpay Test Mode
           </div>
         </div>
 
@@ -304,7 +395,7 @@ const CheckoutPage = () => {
                             <CreditCard className="w-6 h-6 text-orange-600" />
                           </div>
                           <div>
-                            <p className="font-bold text-gray-900">Secure Online Payment</p>
+                            <p className="font-bold text-gray-900">Razorpay Secure Payment</p>
                             <p className="text-xs text-gray-500">Pay via UPI, Cards, or Netbanking</p>
                           </div>
                         </div>
@@ -314,20 +405,31 @@ const CheckoutPage = () => {
                       <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
                         <div className="flex items-center gap-3 mb-4">
                           <ShieldCheck className="w-5 h-5 text-green-600" />
-                          <p className="text-sm font-bold text-gray-900">100% Secure Transaction</p>
+                          <p className="text-sm font-bold text-gray-900">Secure Razorpay Gateway</p>
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          Your payment is processed securely. We do not store your card details. By clicking "Place Order", you agree to our terms and conditions.
+                          Your payment is processed securely via Razorpay. We do not store your card details. By clicking "Pay & Place Order", you will be redirected to the Razorpay payment window.
                         </p>
                       </div>
 
-                      <button 
-                        onClick={handlePlaceOrder}
-                        disabled={loading}
-                        className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
-                      >
-                        {loading ? 'Processing...' : `Pay ₹${finalTotal} & Place Order`}
-                      </button>
+                      <div className="flex flex-col gap-4">
+                        <button 
+                          onClick={handlePlaceOrder}
+                          disabled={loading}
+                          className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
+                        >
+                          {loading ? 'Processing...' : `Pay ₹${finalTotal} & Place Order`}
+                        </button>
+                        
+                        <button 
+                          onClick={handleMockPayment}
+                          disabled={loading}
+                          className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold text-sm hover:bg-gray-200 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
+                        >
+                          <ShieldCheck className="w-4 h-4" />
+                          Test Payment (Skip Razorpay)
+                        </button>
+                      </div>
                     </>
                   ) : paymentStep === 'processing' ? (
                     <div className="py-12 text-center">
@@ -421,8 +523,8 @@ const CheckoutPage = () => {
                 )}
 
                 <div className="flex justify-between text-sm text-gray-600">
-                  <span>Shipping</span>
-                  <span className="text-green-600 font-bold uppercase">Free</span>
+                  <span>Delivery Charge</span>
+                  <span className="font-bold text-gray-900">₹{DELIVERY_CHARGE}</span>
                 </div>
 
                 <div className="pt-4 border-t border-gray-100 flex justify-between items-end">

@@ -215,6 +215,14 @@ service cloud.firestore {
              isValidDateString(data.expiresAt);
     }
 
+    function isValidTrainerProfile(data) {
+      return hasOnlyAllowedFields(['name', 'image', 'bio', 'updatedAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidOptionalString('image', 0, 1000) &&
+             isValidOptionalString('bio', 0, 2000) &&
+             isValidDateString(data.updatedAt);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -297,8 +305,9 @@ service cloud.firestore {
       // Anyone can read global settings.
       allow read, list: if true;
       
-      // Only global admin can manage settings.
-      allow write: if isGlobalAdmin();
+      // Only global admin can manage global settings.
+      // Regular admins can manage the trainer profile.
+      allow write: if isGlobalAdmin() || (isAdmin() && settingId == 'trainer' && isValidTrainerProfile(request.resource.data));
     }
 
     match /audit_logs/{logId} {

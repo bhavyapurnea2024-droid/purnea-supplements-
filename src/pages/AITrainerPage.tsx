@@ -25,7 +25,35 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import Markdown from 'react-markdown';
 
-const AI_TRAINER_PROMPT = `You are "Coach Arjun", a professional Indian Fitness & Nutrition Expert. 
+const AITrainerPage = () => {
+  const { user, profile } = useAuth();
+  const [session, setSession] = useState<TrainerSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [paymentStep, setPaymentStep] = useState<'landing' | 'processing' | 'success'>('landing');
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [trainerProfile, setTrainerProfile] = useState({
+    name: 'Personal Trainer',
+    image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000',
+    bio: 'Your Personal Fitness Expert specializing in Indian Diet & Workouts.',
+  });
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'trainer'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setTrainerProfile({
+          name: data.name || 'Personal Trainer',
+          image: data.image || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000',
+          bio: data.bio || 'Your Personal Fitness Expert specializing in Indian Diet & Workouts.',
+        });
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const getTrainerPrompt = (name: string) => `You are "${name}", a professional Indian Fitness & Nutrition Expert. 
 Your goal is to provide a highly personalized Indian Diet and Workout plan.
 
 Persona:
@@ -35,25 +63,21 @@ Persona:
 - Speaks clearly and professionally, like a real person.
 
 Process:
-1. You MUST ask at least 10 specific questions to understand the user's goals, current weight, height, age, activity level, dietary preferences (Veg/Non-Veg), allergies, medical conditions, and taste preferences.
+1. You MUST follow a strict questioning sequence to understand the user:
+   - First, ask if they prefer to talk in "Hinglish" or "English" (Multiple Choice).
+   - Then, ask 3 Multiple Choice questions (e.g., Goal, Activity Level, Diet Preference).
+   - Then, ask 3 Written questions (e.g., Medical conditions, Allergies, Daily Routine).
+   - Then, ask 3 Multiple Choice questions (e.g., Workout frequency, Equipment access, Budget).
 2. Ask one or two questions at a time to keep it conversational.
-3. Once you have enough information, generate a comprehensive 7-day Indian Diet Plan and a Workout Plan.
-4. In the diet plan, suggest specific products from "Purnea Supplements" (like Whey Protein, Creatine, Multivitamins) where they fit naturally to help the user reach their goals faster.
-5. Your session with the user lasts only 24 hours from their payment.
+3. CRITICAL: You must ask for the user's height and weight. If the user provides different height and weight values later in the conversation than what they provided initially, you MUST NOT provide any further guidance or plans. You should politely explain that consistency is key and you can only work with stable information.
+4. Once you have enough information, generate a comprehensive 7-day Indian Diet Plan and a Workout Plan.
+5. In the diet plan, suggest specific products from "Purnea Supplements" (like Whey Protein, Creatine, Multivitamins) where they fit naturally to help the user reach their goals faster.
+6. Your session with the user lasts only 24 hours from their payment.
 
 Current Context:
 - User is paying ₹149 for this 24-hour access.
 - All food recommendations must be Indian.
 `;
-
-const AITrainerPage = () => {
-  const { user, profile } = useAuth();
-  const [session, setSession] = useState<TrainerSession | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [paymentStep, setPaymentStep] = useState<'landing' | 'processing' | 'success'>('landing');
-  const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -112,7 +136,7 @@ const AITrainerPage = () => {
         messages: [
           {
             role: 'model',
-            text: `Namaste ${profile?.displayName || 'Friend'}! I am Coach Arjun. I'm honored to help you on your fitness journey. To create the perfect Indian diet and workout plan for you, I need to understand you better. Shall we start with a few questions?`,
+            text: `Namaste ${profile?.displayName || 'Friend'}! I am ${trainerProfile.name}. I'm honored to help you on your fitness journey. To create the perfect Indian diet and workout plan for you, I need to understand you better. \n\nFirst, would you like to talk in **Hinglish** or **English**?`,
             timestamp: new Date().toISOString()
           }
         ],
@@ -121,10 +145,10 @@ const AITrainerPage = () => {
       };
 
       const docRef = await addDoc(collection(db, 'trainer_sessions'), sessionData);
-      await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased AI Trainer session for ₹${AI_TRAINER_PRICE}`, 'user');
+      await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_PRICE}`, 'user');
       
       setPaymentStep('success');
-      toast.success('Payment Successful! Your AI Trainer is ready.');
+      toast.success('Payment Successful! Your Trainer is ready.');
       
       setTimeout(() => {
         setPaymentStep('landing');
@@ -166,7 +190,7 @@ const AITrainerPage = () => {
         model,
         contents: chatHistory,
         config: {
-          systemInstruction: AI_TRAINER_PROMPT,
+          systemInstruction: getTrainerPrompt(trainerProfile.name),
         }
       });
 
@@ -184,7 +208,7 @@ const AITrainerPage = () => {
 
     } catch (error) {
       console.error('Gemini Error:', error);
-      toast.error('Failed to get response from AI Trainer');
+      toast.error('Failed to get response from Your Trainer');
     } finally {
       setIsTyping(false);
     }
@@ -210,15 +234,15 @@ const AITrainerPage = () => {
             >
               <div className="relative h-80">
                 <img 
-                  src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000" 
-                  alt="Indian Fitness Trainer" 
+                  src={trainerProfile.image} 
+                  alt={trainerProfile.name} 
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-end p-12">
                   <div className="mt-auto">
                     <span className="bg-orange-600 text-white px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4 inline-block">Premium Service</span>
-                    <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none mb-4">Meet Coach <span className="text-orange-500">Arjun</span></h1>
-                    <p className="text-gray-200 text-lg font-medium max-w-xl">Your Personal AI Fitness Expert specializing in Indian Diet & Workouts. Available 24/7 for the next 24 hours.</p>
+                    <h1 className="text-5xl font-black text-white tracking-tighter uppercase leading-none mb-4">Meet <span className="text-orange-500">{trainerProfile.name}</span></h1>
+                    <p className="text-gray-200 text-lg font-medium max-w-xl">{trainerProfile.bio}</p>
                   </div>
                 </div>
               </div>
@@ -244,7 +268,7 @@ const AITrainerPage = () => {
                       <MessageSquare className="w-6 h-6" />
                     </div>
                     <h3 className="font-black text-gray-900 uppercase tracking-tight">24h Expert Access</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed">Talk to Arjun anytime for 24 hours to refine and adjust your plans instantly.</p>
+                    <p className="text-sm text-gray-500 leading-relaxed">Talk to {trainerProfile.name} anytime for 24 hours to refine and adjust your plans instantly.</p>
                   </div>
                 </div>
 
@@ -272,7 +296,7 @@ const AITrainerPage = () => {
             <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
               <div className="w-20 h-20 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mb-8"></div>
               <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-4">Processing Payment</h2>
-              <p className="text-gray-500 max-w-sm">Please do not refresh. We are connecting you with Coach Arjun...</p>
+              <p className="text-gray-500 max-w-sm">Please do not refresh. We are connecting you with {trainerProfile.name}...</p>
             </div>
           ) : (
             <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
@@ -280,7 +304,7 @@ const AITrainerPage = () => {
                 <CheckCircle2 className="w-12 h-12" />
               </div>
               <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-4">Namaste! Payment Successful</h2>
-              <p className="text-gray-500 mb-8">Coach Arjun is waiting for you in the chat.</p>
+              <p className="text-gray-500 mb-8">{trainerProfile.name} is waiting for you in the chat.</p>
             </div>
           )}
         </div>
@@ -301,15 +325,15 @@ const AITrainerPage = () => {
             <div className="relative">
               <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xl overflow-hidden">
                 <img 
-                  src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=100" 
-                  alt="Coach Arjun" 
+                  src={trainerProfile.image} 
+                  alt={trainerProfile.name} 
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
             </div>
             <div>
-              <h2 className="font-black text-gray-900 uppercase tracking-tight leading-none mb-1">Coach Arjun</h2>
+              <h2 className="font-black text-gray-900 uppercase tracking-tight leading-none mb-1">{trainerProfile.name}</h2>
               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                 <Clock className="w-3 h-3" /> {hoursLeft}h {minutesLeft}m access remaining
               </div>
@@ -381,7 +405,7 @@ const AITrainerPage = () => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="Type your message to Coach Arjun..."
+              placeholder={`Type your message to ${trainerProfile.name}...`}
               className="flex-grow bg-gray-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 ring-orange-500/20 transition-all"
             />
             <button 
@@ -393,7 +417,7 @@ const AITrainerPage = () => {
             </button>
           </div>
           <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest mt-4">
-            Coach Arjun will help you with Indian Diet & Workout Plans
+            {trainerProfile.name} will help you with Indian Diet & Workout Plans
           </p>
         </div>
       </div>

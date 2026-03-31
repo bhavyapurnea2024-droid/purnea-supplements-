@@ -42,7 +42,7 @@ const Navbar = () => {
     { name: 'Home', path: '/' },
     { name: 'Shop', path: '/shop' },
     { name: 'MyCampaign', path: '/my-campaign' },
-    { name: 'AI Trainer', path: '/ai-trainer' },
+    { name: 'Your Trainer', path: '/ai-trainer' },
   ];
 
   return (
@@ -204,13 +204,13 @@ const Footer = () => (
           </Link>
           <p className="text-sm leading-relaxed max-w-sm">
             Your premium destination for high-quality fitness supplements. We help you reach your goals with science-backed nutrition and a community-driven referral system.
-          </p>
+            </p>
         </div>
         <div>
           <h4 className="text-white font-bold mb-6">Quick Links</h4>
           <ul className="space-y-4 text-sm">
             <li><Link to="/shop" className="hover:text-orange-500 transition-colors">Shop All</Link></li>
-            <li><Link to="/ai-trainer" className="hover:text-orange-500 transition-colors font-bold text-orange-600">AI Trainer</Link></li>
+            <li><Link to="/ai-trainer" className="hover:text-orange-500 transition-colors font-bold text-orange-600">Your Trainer</Link></li>
             <li><Link to="/my-campaign" className="hover:text-orange-500 transition-colors">MyCampaign</Link></li>
             <li><Link to="/orders" className="hover:text-orange-500 transition-colors">Order Tracking</Link></li>
             <li><Link to="/about" className="hover:text-orange-500 transition-colors">About Us</Link></li>
@@ -256,28 +256,30 @@ const Footer = () => (
 
 const AppContent = () => {
   const { isLoginModalOpen, setIsLoginModalOpen } = useAuth();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col bg-white font-sans selection:bg-orange-100 selection:text-orange-900">
-        <Navbar />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/shop" element={<ProductListingPage />} />
-            <Route path="/product/:id" element={<ProductDetailPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/my-campaign" element={<MyCampaignPage />} />
-            <Route path="/ai-trainer" element={<AITrainerPage />} />
-            <Route path="/admin/*" element={<AdminDashboard />} />
-            <Route path="/orders" element={<OrderHistoryPage />} />
-            <Route path="/login" element={<LoginPage />} />
-          </Routes>
-        </main>
-        <Footer />
-        
-        {/* Floating WhatsApp Button */}
+    <div className="min-h-screen flex flex-col bg-white font-sans selection:bg-orange-100 selection:text-orange-900">
+      {!isAdminRoute && <Navbar />}
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/shop" element={<ProductListingPage />} />
+          <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/my-campaign" element={<MyCampaignPage />} />
+          <Route path="/ai-trainer" element={<AITrainerPage />} />
+          <Route path="/admin/*" element={<AdminDashboard />} />
+          <Route path="/orders" element={<OrderHistoryPage />} />
+          <Route path="/login" element={<LoginPage />} />
+        </Routes>
+      </main>
+      {!isAdminRoute && <Footer />}
+      
+      {/* Floating WhatsApp Button */}
+      {!isAdminRoute && (
         <a 
           href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`}
           target="_blank"
@@ -290,23 +292,25 @@ const AppContent = () => {
             Chat with us
           </span>
         </a>
+      )}
 
-        <Toaster position="top-center" richColors />
-        <LoginModal 
-          isOpen={isLoginModalOpen} 
-          onClose={() => setIsLoginModalOpen(false)} 
-        />
-      </div>
-    </Router>
+      <Toaster position="top-center" richColors />
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+      />
+    </div>
   );
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <AppContent />
-      </CartProvider>
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
+      </AuthProvider>
+    </Router>
   );
 }

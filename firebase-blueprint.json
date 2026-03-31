@@ -123,6 +123,18 @@
       },
       "required": ["defaultCommissionRate", "minWithdrawalAmount", "updatedAt"]
     },
+    "TrainerProfile": {
+      "title": "Trainer Profile",
+      "description": "Stores the AI Trainer's profile information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "image": { "type": "string" },
+        "bio": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "updatedAt"]
+    },
     "TrainerSession": {
       "title": "Trainer Session",
       "description": "Stores AI Trainer sessions and plans.",
@@ -150,6 +162,10 @@
     "/withdrawals/{withdrawalId}": { "schema": "WithdrawalRequest", "description": "Withdrawal requests." },
     "/audit_logs/{logId}": { "schema": "AuditLog", "description": "System audit logs." },
     "/settings/global": { "schema": "GlobalSettings", "description": "Global platform settings." },
+    "/settings/trainer": {
+      "schema": "TrainerProfile",
+      "description": "The AI Trainer's profile settings."
+    },
     "/trainer_sessions/{sessionId}": { "schema": "TrainerSession", "description": "AI Trainer sessions." }
   }
 }
