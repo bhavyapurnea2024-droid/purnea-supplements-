@@ -98,6 +98,8 @@ service cloud.firestore {
       return isAuthenticated() &&
         (request.auth.uid == "DPxuopbYhnO9aL4CWL2ry5uS6Iw1" ||
          request.auth.token.email == "piyushpurnea15@gmail.com" || 
+         request.auth.token.email == "prcreations2927@gmail.com" ||
+         request.auth.token.email == "bhavyapurnea2024@gmail.com" ||
          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
@@ -105,7 +107,9 @@ service cloud.firestore {
     function isGlobalAdmin() {
       return isAuthenticated() && 
         (request.auth.uid == "DPxuopbYhnO9aL4CWL2ry5uS6Iw1" ||
-         request.auth.token.email == "piyushpurnea15@gmail.com");
+         request.auth.token.email == "piyushpurnea15@gmail.com" ||
+         request.auth.token.email == "prcreations2927@gmail.com" ||
+         request.auth.token.email == "bhavyapurnea2024@gmail.com");
     }
 
     function hasRequiredFields(fields) {
@@ -242,7 +246,9 @@ service cloud.firestore {
 
     match /users/{userId} {
       // Users can read their own profile. Admins can read all.
-      allow read, list: if isOwner(userId) || isAdmin();
+      // Also allow listing for coupon code lookups (limited by query in app)
+      allow read: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin() || isAuthenticated();
       
       // Create profile: must be the owner, role must be 'user' unless admin.
       allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
