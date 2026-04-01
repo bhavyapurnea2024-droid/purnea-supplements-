@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit, increment } from 'firebase/firestore';
 import { TrainerSession, TrainerMessage } from '../types';
 import { AI_TRAINER_PRICE, AI_TRAINER_SESSION_DURATION } from '../constants';
 import { GoogleGenAI } from "@google/genai";
@@ -19,7 +19,9 @@ import {
   Sparkles,
   Send,
   AlertCircle,
-  IndianRupee
+  IndianRupee,
+  Copy,
+  Wallet
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -30,13 +32,17 @@ const AITrainerPage = () => {
   const [session, setSession] = useState<TrainerSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<'landing' | 'processing' | 'success'>('landing');
+  const [paymentMethod, setPaymentMethod] = useState<'cashfree' | 'wallet'>('cashfree');
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [cashfree, setCashfree] = useState<any>(null);
   const [trainerProfile, setTrainerProfile] = useState({
     name: 'Personal Trainer',
     image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000',
     bio: 'Your Personal Fitness Expert specializing in Indian Diet & Workouts.',
   });
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,26 +59,61 @@ const AITrainerPage = () => {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    const initCashfree = () => {
+      if ((window as any).Cashfree) {
+        try {
+          const cf = (window as any).Cashfree({
+            mode: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+          });
+          setCashfree(cf);
+          console.log("Cashfree SDK initialized in Trainer Page");
+        } catch (err) {
+          console.error("Error initializing Cashfree SDK:", err);
+        }
+      }
+    };
+
+    if ((window as any).Cashfree) {
+      initCashfree();
+    } else {
+      const interval = setInterval(() => {
+        if ((window as any).Cashfree) {
+          initCashfree();
+          clearInterval(interval);
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
   const getTrainerPrompt = (name: string) => `You are "${name}", a professional Indian Fitness & Nutrition Expert. 
 Your goal is to provide a highly personalized Indian Diet and Workout plan.
 
 Persona:
 - Professional, empathetic, and encouraging.
+- Use VERY SIMPLE words. Avoid complex jargon.
+- Ask questions ONE BY ONE. Never ask more than one question in a single message.
 - Expert in Indian cuisine (Dal, Roti, Sabzi, Paneer, Chicken Curry, etc.).
 - Understands Indian lifestyle (long working hours, vegetarian/non-vegetarian preferences).
 - Speaks clearly and professionally, like a real person.
 
 Process:
 1. You MUST follow a strict questioning sequence to understand the user:
+   - Ask questions one by one.
+   - For Multiple Choice questions, use this EXACT format at the end of your message:
+     OPTIONS: ["Option 1", "Option 2", "Option 3"]
    - First, ask if they prefer to talk in "Hinglish" or "English" (Multiple Choice).
    - Then, ask 3 Multiple Choice questions (e.g., Goal, Activity Level, Diet Preference).
    - Then, ask 3 Written questions (e.g., Medical conditions, Allergies, Daily Routine).
    - Then, ask 3 Multiple Choice questions (e.g., Workout frequency, Equipment access, Budget).
-2. Ask one or two questions at a time to keep it conversational.
-3. CRITICAL: You must ask for the user's height and weight. If the user provides different height and weight values later in the conversation than what they provided initially, you MUST NOT provide any further guidance or plans. You should politely explain that consistency is key and you can only work with stable information.
-4. Once you have enough information, generate a comprehensive 7-day Indian Diet Plan and a Workout Plan.
-5. In the diet plan, suggest specific products from "Purnea Supplements" (like Whey Protein, Creatine, Multivitamins) where they fit naturally to help the user reach their goals faster.
-6. Your session with the user lasts only 24 hours from their payment.
+2. CRITICAL: You must ask for the user's height and weight.
+3. Once you have enough information, generate a comprehensive 7-day Indian Diet Plan and a Workout Plan.
+4. WORKOUT REQUIREMENTS: Every exercise MUST include specific Sets and Reps (e.g., 3 Sets of 12 Reps).
+5. DIET REQUIREMENTS: Every food item MUST include measurements in GRAMS (e.g., 100g Paneer, 50g Oats).
+6. Suggest specific products from "Purnea Supplements" (like Whey Protein, Creatine, Multivitamins) where they fit naturally. 
+   - CRITICAL: When suggesting a supplement, ALWAYS include a link to it using this format: [Product Name](/products). For example: [Whey Protein](/products).
+7. Remind the user to COPY their plan because it will vanish after 24 hours.
 
 Current Context:
 - User is paying ₹149 for this 24-hour access.
@@ -114,16 +155,22 @@ Current Context:
   }, [user]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [session?.messages]);
+    if (session?.messages && chatContainerRef.current) {
+      const container = chatContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [session?.messages, isTyping, isConnecting]);
 
-  const handlePayment = async () => {
-    if (!user) return;
+  const handleWalletPayment = async () => {
+    if (!user || !profile) return;
+    
+    if ((profile.wallet?.withdrawable || 0) < AI_TRAINER_PRICE) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
     setPaymentStep('processing');
     
-    // Simulate payment delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
     try {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + AI_TRAINER_SESSION_DURATION);
@@ -145,10 +192,17 @@ Current Context:
       };
 
       const docRef = await addDoc(collection(db, 'trainer_sessions'), sessionData);
-      await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_PRICE}`, 'user');
+      
+      // Deduct from wallet
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        'wallet.withdrawable': increment(-AI_TRAINER_PRICE)
+      });
+
+      await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_PRICE} (Wallet Payment)`, 'user');
       
       setPaymentStep('success');
-      toast.success('Payment Successful! Your Trainer is ready.');
+      toast.success('Payment Successful via Wallet! Your Trainer is ready.');
       
       setTimeout(() => {
         setPaymentStep('landing');
@@ -159,30 +213,87 @@ Current Context:
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || !session || !user) return;
+  const handleCashfreePayment = async () => {
+    if (!user) return;
+    setPaymentStep('processing');
+    
+    // For now, since we don't have a dedicated Cashfree flow for the trainer yet,
+    // we'll simulate it or redirect to checkout if needed.
+    // However, the user asked to make Cashfree the default.
+    // Let's implement a simple Cashfree order creation for the trainer.
+    
+    const orderId = `trainer_${Date.now()}`;
+
+    try {
+      const response = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderAmount: AI_TRAINER_PRICE,
+          customerId: user.uid,
+          customerPhone: profile?.phoneNumber || '0000000000',
+          customerEmail: user.email,
+          orderId: orderId
+        })
+      });
+
+      const data = await response.json();
+      if (!data.payment_session_id) {
+        throw new Error(data.message || 'Failed to create payment session');
+      }
+
+      // Use initialized Cashfree
+      if (cashfree) {
+        cashfree.checkout({
+          paymentSessionId: data.payment_session_id,
+          redirectTarget: "_self",
+        });
+      } else {
+        throw new Error("Cashfree SDK not ready");
+      }
+    } catch (error) {
+      console.error("Payment Error:", error);
+      toast.error("Payment initiation failed.");
+      setPaymentStep('landing');
+    }
+  };
+
+  const sendMessage = async (textOverride?: string) => {
+    const textToSend = textOverride || inputText;
+    if (!textToSend.trim() || !session || !user) return;
 
     const userMessage: TrainerMessage = {
       role: 'user',
-      text: inputText,
+      text: textToSend,
       timestamp: new Date().toISOString()
     };
 
-    // Count user messages to determine delay
+    // Calculate delay
+    const lastMessage = session.messages[session.messages.length - 1];
+    const timeSinceLastMessage = lastMessage 
+      ? Date.now() - new Date(lastMessage.timestamp).getTime() 
+      : Infinity;
+    
     const userMessageCount = session.messages.filter(m => m.role === 'user').length;
     const isFirstReply = userMessageCount === 0;
-    const delay = isFirstReply ? 60000 : 5000;
+    const needsLongDelay = isFirstReply || timeSinceLastMessage > 4 * 60 * 1000;
+    const delay = needsLongDelay ? 120000 : 5000;
 
     const updatedMessages = [...session.messages, userMessage];
-    setInputText('');
-    setIsTyping(true);
+    if (!textOverride) setInputText('');
+    
+    if (needsLongDelay) {
+      setIsConnecting(true);
+    } else {
+      setIsTyping(true);
+    }
 
     try {
       // Update Firestore with user message immediately
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       await updateDoc(sessionRef, { messages: updatedMessages });
 
-      // Wait for the specified delay (1 min for first reply, 5s for others)
+      // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, delay));
 
       // Call Gemini
@@ -215,7 +326,6 @@ Current Context:
         timestamp: new Date().toISOString()
       };
 
-      // Get the latest session to ensure we don't overwrite any other updates (though isTyping prevents most)
       await updateDoc(sessionRef, { 
         messages: [...updatedMessages, aiMessage]
       });
@@ -226,6 +336,7 @@ Current Context:
       toast.error(`Failed to get response: ${errorMessage}. Please try again.`);
     } finally {
       setIsTyping(false);
+      setIsConnecting(false);
     }
   };
 
@@ -287,20 +398,49 @@ Current Context:
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8">
-                  <div>
-                    <div className="flex items-center gap-2 text-orange-600 font-black uppercase tracking-widest text-xs mb-2">
-                      <Sparkles className="w-4 h-4" /> Limited Time Offer
+                <div className="bg-gray-50 rounded-3xl p-8 flex flex-col gap-8">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div>
+                      <div className="flex items-center gap-2 text-orange-600 font-black uppercase tracking-widest text-xs mb-2">
+                        <Sparkles className="w-4 h-4" /> Limited Time Offer
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-gray-900">₹{AI_TRAINER_PRICE}</span>
+                        <span className="text-gray-400 line-through font-bold">₹999</span>
+                      </div>
+                      <p className="text-sm text-gray-500 font-medium mt-1">Get your personalized plan in minutes.</p>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-black text-gray-900">₹{AI_TRAINER_PRICE}</span>
-                      <span className="text-gray-400 line-through font-bold">₹999</span>
+                    
+                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                      <button 
+                        onClick={() => setPaymentMethod('cashfree')}
+                        className={cn(
+                          "flex-1 md:w-48 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2",
+                          paymentMethod === 'cashfree' ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white"
+                        )}
+                      >
+                        <CreditCard className="w-6 h-6 text-orange-600" />
+                        <span className="font-bold text-xs uppercase tracking-widest">Cashfree</span>
+                      </button>
+                      <button 
+                        onClick={() => setPaymentMethod('wallet')}
+                        disabled={(profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE}
+                        className={cn(
+                          "flex-1 md:w-48 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2",
+                          paymentMethod === 'wallet' ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white",
+                          (profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE && "opacity-50 grayscale cursor-not-allowed"
+                        )}
+                      >
+                        <Wallet className="w-6 h-6 text-orange-600" />
+                        <span className="font-bold text-xs uppercase tracking-widest">Wallet (₹{profile?.wallet?.withdrawable || 0})</span>
+                      </button>
                     </div>
-                    <p className="text-sm text-gray-500 font-medium mt-1">Get your personalized plan in minutes.</p>
                   </div>
+
                   <button 
-                    onClick={handlePayment}
-                    className="bg-orange-600 text-white px-12 py-5 rounded-2xl font-black text-xl hover:bg-orange-700 shadow-2xl shadow-orange-600/20 transition-all active:scale-95 flex items-center gap-3"
+                    onClick={paymentMethod === 'cashfree' ? handleCashfreePayment : handleWalletPayment}
+                    disabled={(paymentMethod === 'wallet' && (profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE)}
+                    className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-orange-700 shadow-2xl shadow-orange-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
                   >
                     Start My Transformation <ChevronRight className="w-6 h-6" />
                   </button>
@@ -367,54 +507,91 @@ Current Context:
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-grow overflow-y-auto p-4 sm:p-8">
+      <div 
+        ref={chatContainerRef}
+        className="flex-grow overflow-y-auto p-4 sm:p-8 scroll-smooth"
+      >
         <div className="max-w-4xl mx-auto space-y-8">
-          {session.messages.map((msg, i) => (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              key={i} 
-              className={cn(
-                "flex gap-4 max-w-[85%]",
-                msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-xs",
-                msg.role === 'user' ? "bg-gray-900 text-white" : "bg-orange-100 text-orange-600"
-              )}>
-                {msg.role === 'user' ? profile?.displayName?.charAt(0) || 'U' : 'A'}
-              </div>
-              <div className={cn(
-                "p-6 rounded-3xl shadow-sm",
-                msg.role === 'user' ? "bg-gray-900 text-white rounded-tr-none" : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
-              )}>
-                <div className="prose prose-sm max-w-none prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit prose-ul:text-inherit">
-                  <Markdown>{msg.text}</Markdown>
-                </div>
-                <p className={cn(
-                  "text-[10px] mt-4 font-bold uppercase tracking-widest opacity-40",
-                  msg.role === 'user' ? "text-right" : ""
+          {session.messages.map((msg, i) => {
+            const optionsMatch = msg.text.match(/OPTIONS:\s*(\[.*\])/);
+            const options = optionsMatch ? JSON.parse(optionsMatch[1]) : null;
+            const cleanText = msg.text.replace(/OPTIONS:\s*\[.*\]/, '').trim();
+            const isPlan = msg.text.toLowerCase().includes('diet plan') || msg.text.toLowerCase().includes('workout plan');
+
+            return (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={i} 
+                className={cn(
+                  "flex gap-4 max-w-[90%]",
+                  msg.role === 'user' ? "ml-auto flex-row-reverse" : ""
+                )}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-xs",
+                  msg.role === 'user' ? "bg-gray-900 text-white" : "bg-orange-100 text-orange-600"
                 )}>
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-          {isTyping && (
+                  {msg.role === 'user' ? profile?.displayName?.charAt(0) || 'U' : 'A'}
+                </div>
+                <div className="flex flex-col gap-2 flex-grow">
+                  <div className={cn(
+                    "p-6 rounded-3xl shadow-sm relative group",
+                    msg.role === 'user' ? "bg-gray-900 text-white rounded-tr-none" : "bg-white text-gray-800 rounded-tl-none border border-gray-100"
+                  )}>
+                    {isPlan && (
+                      <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(cleanText);
+                            toast.success('Plan copied to clipboard!');
+                          }}
+                          className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-all"
+                          title="Copy Plan"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <div className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest animate-pulse">
+                          Copy now! Vanishes in 24h
+                        </div>
+                      </div>
+                    )}
+                    <div className="prose prose-sm max-w-none prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit prose-ul:text-inherit">
+                      <Markdown>{cleanText}</Markdown>
+                    </div>
+                    <p className={cn(
+                      "text-[10px] mt-4 font-bold uppercase tracking-widest opacity-40",
+                      msg.role === 'user' ? "text-right" : ""
+                    )}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  
+                  {options && msg.role === 'model' && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {options.map((opt: string, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => sendMessage(opt)}
+                          disabled={isTyping}
+                          className="bg-orange-50 hover:bg-orange-100 text-orange-600 px-4 py-2 rounded-xl text-xs font-bold border border-orange-200 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+          {isConnecting && (
             <div className="flex gap-4 max-w-[85%]">
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">A</div>
               <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
                 <div className="flex flex-col gap-3">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                  </div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    {session.messages.filter(m => m.role === 'user').length === 1 
-                      ? "Analyzing your profile... (First reply takes ~1 min)" 
-                      : "Trainer is typing..."}
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
+                    Connecting you to the best trainer...
                   </p>
                 </div>
               </div>
@@ -437,8 +614,8 @@ Current Context:
               className="flex-grow bg-gray-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 ring-orange-500/20 transition-all"
             />
             <button 
-              onClick={sendMessage}
-              disabled={!inputText.trim() || isTyping}
+              onClick={() => sendMessage()}
+              disabled={!inputText.trim() || isTyping || isConnecting}
               className="bg-orange-600 text-white p-4 rounded-2xl hover:bg-orange-700 transition-all active:scale-95 disabled:bg-gray-200 disabled:scale-100"
             >
               <Send className="w-5 h-5" />

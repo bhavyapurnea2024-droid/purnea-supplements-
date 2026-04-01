@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, increment, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, increment, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth, logAction } from '../firebase';
 import { useCart } from '../CartContext';
 import { useAuth } from '../AuthContext';
@@ -55,6 +55,39 @@ const CheckoutPage = () => {
   }, [items, user, navigate]);
 
   const [paymentStep, setPaymentStep] = useState<'selection' | 'processing' | 'success'>('selection');
+  const [paymentMethod, setPaymentMethod] = useState<'cashfree' | 'wallet'>('cashfree');
+  const [cashfree, setCashfree] = useState<any>(null);
+
+  useEffect(() => {
+    const initCashfree = () => {
+      if ((window as any).Cashfree) {
+        try {
+          // Initialize Cashfree SDK v3
+          const cf = (window as any).Cashfree({
+            mode: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+          });
+          setCashfree(cf);
+          console.log("Cashfree SDK initialized successfully");
+        } catch (err) {
+          console.error("Error initializing Cashfree SDK:", err);
+        }
+      }
+    };
+
+    // If script is already loaded, initialize immediately
+    if ((window as any).Cashfree) {
+      initCashfree();
+    } else {
+      // Otherwise, check periodically or wait for load (since it's in index.html, it should be fast)
+      const interval = setInterval(() => {
+        if ((window as any).Cashfree) {
+          initCashfree();
+          clearInterval(interval);
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, []);
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -94,127 +127,106 @@ const CheckoutPage = () => {
     }
   };
 
-  const handlePlaceOrder = async () => {
-    if (!user) return;
-    
-    const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
-
-    // Razorpay Dummy Integration
-    const options = {
-      key: "rzp_test_dummykey", // Dummy Key
-      amount: totalAmount * 100, // Amount in paise
-      currency: "INR",
-      name: "Purnea Supplements",
-      description: "Order Payment",
-      image: "https://ui-avatars.com/api/?name=P&background=ea580c&color=fff",
-      handler: async function (response: any) {
-        // Payment successful
-        setLoading(true);
-        setPaymentStep('processing');
-        
-        try {
-          const orderData: Omit<Order, 'id'> = {
-            userId: user.uid,
-            items,
-            totalAmount,
-            discountAmount: appliedCoupon?.discount || 0,
-            couponUsed: appliedCoupon?.code || null,
-            referralUserId: appliedCoupon?.userId || null,
-            status: 'pending',
-            paymentStatus: 'completed',
-            paymentId: response.razorpay_payment_id || 'dummy_payment_id',
-            shippingAddress: address,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          const orderRef = await addDoc(collection(db, 'orders'), orderData);
-          await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount}`, 'user');
-          
-          if (appliedCoupon) {
-            const commissionAmount = subtotal * appliedCoupon.commissionRate;
-            await addDoc(collection(db, 'referrals'), {
-              couponOwnerId: appliedCoupon.userId,
-              orderId: orderRef.id,
-              amount: commissionAmount,
-              orderTotal: totalAmount,
-              customerName: address.fullName,
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-            });
-
-            const userRef = doc(db, 'users', appliedCoupon.userId);
-            await updateDoc(userRef, {
-              'wallet.pending': increment(commissionAmount),
-              'wallet.totalEarned': increment(commissionAmount),
-            });
-          }
-
-          setPaymentStep('success');
-          toast.success('Payment Successful & Order Placed!');
-          
-          const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
-          const whatsappMessage = `*New Order Received!*%0A%0A` +
-            `*Order ID:* %23${orderRef.id.slice(-6).toUpperCase()}%0A` +
-            `*Customer:* ${address.fullName}%0A` +
-            `*Phone:* ${address.phone}%0A` +
-            `*Total:* ₹${totalAmount}%0A` +
-            `*Items:* ${itemsList}%0A` +
-            `*Address:* ${address.addressLine1}, ${address.city}, ${address.state} - ${address.zipCode}%0A%0A` +
-            `_Please process this order as soon as possible._`;
-
-          const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
-          window.open(whatsappUrl, '_blank');
-          
-          setTimeout(() => {
-            clearCart();
-          }, 1000);
-        } catch (error) {
-          setPaymentStep('selection');
-          handleFirestoreError(error, OperationType.CREATE, 'orders');
-        } finally {
-          setLoading(false);
-        }
-      },
-      prefill: {
-        name: address.fullName,
-        email: user.email,
-        contact: address.phone
-      },
-      theme: {
-        color: "#ea580c"
-      }
-    };
-
-    const rzp = new (window as any).Razorpay(options);
-    rzp.open();
-  };
-
-  const handleMockPayment = async () => {
-    if (!user) return;
+  const handleCashfreePayment = async () => {
+    if (!user || !cashfree) return;
     setLoading(true);
-    setPaymentStep('processing');
     
     const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
+    const orderId = `order_${Date.now()}`;
 
     try {
-      const orderData: Omit<Order, 'id'> = {
+      // 1. Create order on backend
+      const response = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderAmount: totalAmount,
+          customerId: user.uid,
+          customerPhone: address.phone,
+          customerEmail: user.email,
+          orderId: orderId
+        })
+      });
+
+      const data = await response.json();
+      if (!data.payment_session_id) {
+        throw new Error(data.message || 'Failed to create payment session');
+      }
+
+      // 2. Save order as 'pending' in Firestore before redirecting
+      const orderData: any = {
         userId: user.uid,
         items,
         totalAmount,
         discountAmount: appliedCoupon?.discount || 0,
         couponUsed: appliedCoupon?.code || null,
         referralUserId: appliedCoupon?.userId || null,
+        commissionAmount: appliedCoupon ? (subtotal * appliedCoupon.commissionRate) : 0,
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentId: orderId,
+        shippingAddress: address,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      await setDoc(doc(db, 'orders', orderId), orderData);
+      await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_PAYMENT', `Initiated payment for order #${orderId.slice(-6)} for ₹${totalAmount}`, 'user');
+
+      // 3. Initiate Cashfree Checkout
+      const checkoutOptions = {
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_self",
+      };
+
+      cashfree.checkout(checkoutOptions);
+    } catch (error) {
+      console.error("Payment Error:", error);
+      toast.error("Payment initiation failed. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  const handleWalletPayment = async () => {
+    if (!user || !profile) return;
+    
+    const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
+    
+    if ((profile.wallet?.withdrawable || 0) < totalAmount) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
+    setLoading(true);
+    setPaymentStep('processing');
+
+    try {
+      const orderData: any = {
+        userId: user.uid,
+        items,
+        totalAmount,
+        discountAmount: appliedCoupon?.discount || 0,
+        couponUsed: appliedCoupon?.code || null,
+        referralUserId: appliedCoupon?.userId || null,
+        commissionAmount: appliedCoupon ? (subtotal * appliedCoupon.commissionRate) : 0,
         status: 'pending',
         paymentStatus: 'completed',
-        paymentId: 'mock_payment_' + Math.random().toString(36).substr(2, 9),
+        paymentId: 'wallet_pay_' + Math.random().toString(36).substr(2, 9),
+        paymentMethod: 'wallet',
         shippingAddress: address,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
-      await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount} (Mock Payment)`, 'user');
+      
+      // Deduct from wallet
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        'wallet.withdrawable': increment(-totalAmount)
+      });
+
+      await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount} (Wallet Payment)`, 'user');
       
       if (appliedCoupon) {
         const commissionAmount = subtotal * appliedCoupon.commissionRate;
@@ -228,18 +240,18 @@ const CheckoutPage = () => {
           createdAt: new Date().toISOString(),
         });
 
-        const userRef = doc(db, 'users', appliedCoupon.userId);
-        await updateDoc(userRef, {
+        const referralUserRef = doc(db, 'users', appliedCoupon.userId);
+        await updateDoc(referralUserRef, {
           'wallet.pending': increment(commissionAmount),
           'wallet.totalEarned': increment(commissionAmount),
         });
       }
 
       setPaymentStep('success');
-      toast.success('Mock Payment Successful & Order Placed!');
+      toast.success('Payment Successful via Wallet!');
       
       const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
-      const whatsappMessage = `*New Order Received (MOCK)!*%0A%0A` +
+      const whatsappMessage = `*New Order Received (Wallet Pay)!*%0A%0A` +
         `*Order ID:* %23${orderRef.id.slice(-6).toUpperCase()}%0A` +
         `*Customer:* ${address.fullName}%0A` +
         `*Phone:* ${address.phone}%0A` +
@@ -273,9 +285,9 @@ const CheckoutPage = () => {
             <ChevronRight className="w-4 h-4" />
             <span className="text-gray-900 font-bold">Checkout</span>
           </div>
-          <div className="flex items-center gap-2 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">
+          <div className="flex items-center gap-2 bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
             <ShieldCheck className="w-3 h-3" />
-            Razorpay Test Mode
+            Cashfree Secure Checkout
           </div>
         </div>
 
@@ -389,45 +401,66 @@ const CheckoutPage = () => {
                 <div className="space-y-6">
                   {paymentStep === 'selection' ? (
                     <>
-                      <div className="p-6 border-2 border-orange-500 bg-orange-50 rounded-2xl flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                            <CreditCard className="w-6 h-6 text-orange-600" />
+                      <div className="space-y-4">
+                        <div 
+                          onClick={() => setPaymentMethod('cashfree')}
+                          className={cn(
+                            "p-6 border-2 rounded-2xl flex items-center justify-between cursor-pointer transition-all",
+                            paymentMethod === 'cashfree' ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200"
+                          )}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                              <CreditCard className="w-6 h-6 text-orange-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-900">Cashfree Secure Payment</p>
+                              <p className="text-xs text-gray-500">Pay via UPI, Cards, or Netbanking</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-gray-900">Razorpay Secure Payment</p>
-                            <p className="text-xs text-gray-500">Pay via UPI, Cards, or Netbanking</p>
-                          </div>
+                          {paymentMethod === 'cashfree' && <CheckCircle2 className="w-6 h-6 text-orange-600" />}
                         </div>
-                        <CheckCircle2 className="w-6 h-6 text-orange-600" />
+
+                        <div 
+                          onClick={() => setPaymentMethod('wallet')}
+                          className={cn(
+                            "p-6 border-2 rounded-2xl flex items-center justify-between cursor-pointer transition-all",
+                            paymentMethod === 'wallet' ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200",
+                            (profile?.wallet?.withdrawable || 0) < finalTotal && "opacity-50 grayscale cursor-not-allowed"
+                          )}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                              <Wallet className="w-6 h-6 text-orange-600" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-900">Pay with Wallet</p>
+                              <p className="text-xs text-gray-500">Available Balance: ₹{profile?.wallet?.withdrawable || 0}</p>
+                            </div>
+                          </div>
+                          {paymentMethod === 'wallet' && <CheckCircle2 className="w-6 h-6 text-orange-600" />}
+                        </div>
                       </div>
 
                       <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
                         <div className="flex items-center gap-3 mb-4">
                           <ShieldCheck className="w-5 h-5 text-green-600" />
-                          <p className="text-sm font-bold text-gray-900">Secure Razorpay Gateway</p>
+                          <p className="text-sm font-bold text-gray-900">Secure Payment Processing</p>
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          Your payment is processed securely via Razorpay. We do not store your card details. By clicking "Pay & Place Order", you will be redirected to the Razorpay payment window.
+                          {paymentMethod === 'cashfree' 
+                            ? 'Your payment is processed securely via Cashfree. We do not store your card details. By clicking "Pay & Place Order", you will be redirected to the Cashfree payment window.'
+                            : 'The total amount will be deducted from your wallet balance. This is an instant payment method.'}
                         </p>
                       </div>
 
                       <div className="flex flex-col gap-4">
                         <button 
-                          onClick={handlePlaceOrder}
-                          disabled={loading}
+                          onClick={paymentMethod === 'cashfree' ? handleCashfreePayment : handleWalletPayment}
+                          disabled={loading || (paymentMethod === 'wallet' && (profile?.wallet?.withdrawable || 0) < finalTotal)}
                           className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
                         >
                           {loading ? 'Processing...' : `Pay ₹${finalTotal} & Place Order`}
-                        </button>
-                        
-                        <button 
-                          onClick={handleMockPayment}
-                          disabled={loading}
-                          className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold text-sm hover:bg-gray-200 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
-                        >
-                          <ShieldCheck className="w-4 h-4" />
-                          Test Payment (Skip Razorpay)
                         </button>
                       </div>
                     </>

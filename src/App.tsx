@@ -19,6 +19,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import LoginPage from './pages/LoginPage';
 import AITrainerPage from './pages/AITrainerPage';
+import PaymentStatusPage from './pages/PaymentStatusPage';
 import { LoginModal } from './components/LoginModal';
 
 const Navbar = () => {
@@ -273,6 +274,7 @@ const AppContent = () => {
           <Route path="/ai-trainer" element={<AITrainerPage />} />
           <Route path="/admin/*" element={<AdminDashboard />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
+          <Route path="/payment-status" element={<PaymentStatusPage />} />
           <Route path="/login" element={<LoginPage />} />
         </Routes>
       </main>
