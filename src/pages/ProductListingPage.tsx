@@ -173,10 +173,11 @@ const ProductListingPage = () => {
                   >
                     <Link to={`/product/${product.id}`} className="relative h-64 overflow-hidden bg-white flex items-center justify-center">
                       <img 
-                        src={product.images[0] || 'https://picsum.photos/seed/supplement/400/400'} 
+                        src={product.images[0] || `https://picsum.photos/seed/${product.id}/400/400`} 
                         alt={product.name} 
                         className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-500"
                         referrerPolicy="no-referrer"
+                        loading="lazy"
                       />
                       {product.discountPrice && (
                         <span className="absolute top-4 left-4 bg-orange-600 text-white text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest">Sale</span>

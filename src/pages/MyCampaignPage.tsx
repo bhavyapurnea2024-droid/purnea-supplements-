@@ -41,7 +41,10 @@ const MyCampaignPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const qReferrals = query(
       collection(db, 'referrals'), 

@@ -31,17 +31,17 @@ import AdminTrainerSessions from '../components/AdminTrainerSessions';
 import AdminTrainerProfile from '../components/AdminTrainerProfile';
 
 const AdminDashboard = () => {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, loading: authLoading, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Redirect if not admin
   useEffect(() => {
-    if (profile && profile.role !== 'admin') {
+    if (!authLoading && profile && profile.role !== 'admin') {
       navigate('/');
     }
-  }, [profile, navigate]);
+  }, [profile, authLoading, navigate]);
 
   const sidebarLinks = [
     { name: 'Overview', path: '/admin', icon: LayoutDashboard },
@@ -56,6 +56,14 @@ const AdminDashboard = () => {
     { name: 'Audit Logs', path: '/admin/audit-logs', icon: History },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!profile || profile.role !== 'admin') return null;
 

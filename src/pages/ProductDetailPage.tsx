@@ -101,6 +101,7 @@ const ProductDetailPage = () => {
                 alt={product.name} 
                 className="max-w-full max-h-full object-contain"
                 referrerPolicy="no-referrer"
+                loading="eager"
               />
             </motion.div>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
@@ -114,7 +115,13 @@ const ProductDetailPage = () => {
                   )}
                 >
                   <div className="w-full h-full flex items-center justify-center bg-white">
-                    <img src={img} alt={`${product.name} ${i}`} className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
+                    <img 
+                      src={img} 
+                      alt={`${product.name} ${i}`} 
+                      className="max-w-full max-h-full object-contain" 
+                      referrerPolicy="no-referrer" 
+                      loading="lazy"
+                    />
                   </div>
                 </button>
               ))}

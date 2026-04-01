@@ -17,10 +17,10 @@ const firebaseConfig = {
 const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
 
 // Initialize Firebase SDK
-console.log("Initializing Firebase with project ID:", firebaseConfigJson.projectId);
-console.log("Using Firestore database ID:", firebaseConfigJson.firestoreDatabaseId);
-const app = initializeApp(firebaseConfigJson);
-export const db = getFirestore(app, firebaseConfigJson.firestoreDatabaseId);
+console.log("Initializing Firebase with project ID:", firebaseConfig.projectId);
+console.log("Using Firestore database ID:", firestoreDatabaseId);
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app, firestoreDatabaseId);
 export const auth = getAuth(app);
 
 // Set persistence to local (survives browser restart)

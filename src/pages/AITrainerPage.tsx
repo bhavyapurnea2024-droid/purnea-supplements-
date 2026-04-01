@@ -121,7 +121,10 @@ Current Context:
 `;
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const q = query(
       collection(db, 'trainer_sessions'),
@@ -214,46 +217,44 @@ Current Context:
   };
 
   const handleCashfreePayment = async () => {
-    if (!user) return;
+    if (!user || !cashfree) {
+      toast.error("Payment system not ready. Please refresh.");
+      return;
+    }
     setPaymentStep('processing');
-    
-    // For now, since we don't have a dedicated Cashfree flow for the trainer yet,
-    // we'll simulate it or redirect to checkout if needed.
-    // However, the user asked to make Cashfree the default.
-    // Let's implement a simple Cashfree order creation for the trainer.
     
     const orderId = `trainer_${Date.now()}`;
 
     try {
-      const response = await fetch('/api/payment/create-order', {
+      const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderAmount: AI_TRAINER_PRICE,
           customerId: user.uid,
-          customerPhone: profile?.phoneNumber || '0000000000',
+          customerPhone: profile?.phoneNumber || '9999999999',
           customerEmail: user.email,
           orderId: orderId
         })
       });
 
       const data = await response.json();
+      console.log("Trainer Payment Response:", data);
+
       if (!data.payment_session_id) {
-        throw new Error(data.message || 'Failed to create payment session');
+        const errorMsg = data.message || data.error?.message || 'Failed to create payment session';
+        throw new Error(errorMsg);
       }
 
-      // Use initialized Cashfree
-      if (cashfree) {
-        cashfree.checkout({
-          paymentSessionId: data.payment_session_id,
-          redirectTarget: "_self",
-        });
-      } else {
-        throw new Error("Cashfree SDK not ready");
-      }
-    } catch (error) {
+      // Initiate Cashfree Checkout
+      console.log("Initiating Trainer Checkout with session:", data.payment_session_id);
+      cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+        redirectTarget: "_self",
+      });
+    } catch (error: any) {
       console.error("Payment Error:", error);
-      toast.error("Payment initiation failed.");
+      toast.error(`Payment Error: ${error.message || "Failed to initiate payment"}`);
       setPaymentStep('landing');
     }
   };
@@ -303,7 +304,7 @@ Current Context:
       }
       
       const ai = new GoogleGenAI({ apiKey });
-      const model = "gemini-flash-latest";
+      const model = "gemini-3-flash-preview";
       
       const chatHistory = updatedMessages.map(m => ({
         role: m.role === 'user' ? 'user' : 'model',

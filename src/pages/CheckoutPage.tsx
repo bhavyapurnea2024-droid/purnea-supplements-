@@ -15,7 +15,7 @@ const DELIVERY_CHARGE = 40;
 
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1);
@@ -45,6 +45,8 @@ const CheckoutPage = () => {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    
     if (items.length === 0) {
       navigate('/shop');
     }
@@ -52,7 +54,7 @@ const CheckoutPage = () => {
       toast.error('Please sign in to checkout');
       navigate('/shop');
     }
-  }, [items, user, navigate]);
+  }, [items, user, authLoading, navigate]);
 
   const [paymentStep, setPaymentStep] = useState<'selection' | 'processing' | 'success'>('selection');
   const [paymentMethod, setPaymentMethod] = useState<'cashfree' | 'wallet'>('cashfree');
@@ -128,7 +130,10 @@ const CheckoutPage = () => {
   };
 
   const handleCashfreePayment = async () => {
-    if (!user || !cashfree) return;
+    if (!user || !cashfree) {
+      toast.error("Payment system not ready. Please refresh.");
+      return;
+    }
     setLoading(true);
     
     const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
@@ -136,7 +141,7 @@ const CheckoutPage = () => {
 
     try {
       // 1. Create order on backend
-      const response = await fetch('/api/payment/create-order', {
+      const response = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,8 +154,11 @@ const CheckoutPage = () => {
       });
 
       const data = await response.json();
+      console.log("Backend Response:", data);
+
       if (!data.payment_session_id) {
-        throw new Error(data.message || 'Failed to create payment session');
+        const errorMsg = data.message || data.error?.message || 'Failed to create payment session';
+        throw new Error(errorMsg);
       }
 
       // 2. Save order as 'pending' in Firestore before redirecting
@@ -174,15 +182,14 @@ const CheckoutPage = () => {
       await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_PAYMENT', `Initiated payment for order #${orderId.slice(-6)} for ₹${totalAmount}`, 'user');
 
       // 3. Initiate Cashfree Checkout
-      const checkoutOptions = {
+      console.log("Initiating Cashfree Checkout with session:", data.payment_session_id);
+      cashfree.checkout({
         paymentSessionId: data.payment_session_id,
         redirectTarget: "_self",
-      };
-
-      cashfree.checkout(checkoutOptions);
-    } catch (error) {
+      });
+    } catch (error: any) {
       console.error("Payment Error:", error);
-      toast.error("Payment initiation failed. Please try again.");
+      toast.error(`Payment Error: ${error.message || "Failed to initiate payment"}`);
       setLoading(false);
     }
   };

@@ -15,6 +15,7 @@ const HomePage = () => {
             alt="Hero Background" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
+            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-transparent"></div>
         </div>
@@ -88,7 +89,13 @@ const HomePage = () => {
                 className="group relative h-48 rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all"
               >
                 <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <img src={`https://picsum.photos/seed/${cat}/300/300`} alt={cat} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img 
+                    src={`https://picsum.photos/seed/${cat}/300/300`} 
+                    alt={cat} 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer" 
+                    loading="lazy"
+                  />
                 </div>
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">
                   <h3 className="font-black text-gray-900 text-lg leading-tight group-hover:text-orange-600 transition-colors uppercase">{cat}</h3>
