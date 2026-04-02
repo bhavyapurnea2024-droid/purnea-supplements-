@@ -49,9 +49,80 @@ const AITrainerPage = () => {
   useEffect(() => {
     if (!session || !user) return;
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
+      const now = Date.now();
       const lastMessage = session.messages[session.messages.length - 1];
-      if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current) {
+      const lastUserMessage = [...session.messages].reverse().find(m => m.role === 'user');
+      
+      const timeSinceLastUserMessage = lastUserMessage ? now - new Date(lastUserMessage.timestamp).getTime() : 0;
+      const timeSinceLastError = session.lastErrorAt ? now - new Date(session.lastErrorAt).getTime() : Infinity;
+      const timeSincePlanPending = session.planPendingAt ? now - new Date(session.planPendingAt).getTime() : Infinity;
+
+      const sessionRef = doc(db, 'trainer_sessions', session.id);
+
+      // 1. Escalation: If no reply for 2 hours due to API failure
+      if (session.lastErrorAt && timeSinceLastError > 2 * 60 * 60 * 1000 && !session.messages.some(m => m.text.includes(WHATSAPP_NUMBER))) {
+        const escalationMessage: TrainerMessage = {
+          role: 'model',
+          text: `I'm deeply sorry for the delay. It seems I'm having some technical issues with my connection today. Please directly message me on WhatsApp at ${WHATSAPP_NUMBER} so I can help you immediately!`,
+          timestamp: new Date().toISOString()
+        };
+        await updateDoc(sessionRef, { 
+          messages: [...session.messages, escalationMessage],
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+        return;
+      }
+
+      // 2. Plan delivery: Send plan after 30 mins of being pending
+      if (session.isPlanPending && !session.planSent && timeSincePlanPending > 30 * 60 * 1000) {
+        const planMessage: TrainerMessage = {
+          role: 'model',
+          text: `Namaste! Your personalized Indian Diet and Workout plan is ready! \n\n${session.dietPlan}`,
+          timestamp: new Date().toISOString()
+        };
+        await updateDoc(sessionRef, { 
+          messages: [...session.messages, planMessage],
+          planSent: true,
+          isPlanPending: false,
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+        return;
+      }
+
+      // 3. Excuse follow-up: Message after 15 mins of excuse
+      if (session.excuseSentAt && timeSinceLastError > 15 * 60 * 1000 && timeSinceLastError < 20 * 60 * 1000) {
+        const lastMessageIsExcuse = session.messages[session.messages.length - 1].text.includes("driving") || session.messages[session.messages.length - 1].text.includes("session");
+        if (lastMessageIsExcuse) {
+          const followUpMessage: TrainerMessage = {
+            role: 'model',
+            text: "I'm almost there! Just a few more minutes and I'll be ready to help you. Thank you for your patience!",
+            timestamp: new Date().toISOString()
+          };
+          await updateDoc(sessionRef, { 
+            messages: [...session.messages, followUpMessage],
+            lastTrainerMessageAt: new Date().toISOString()
+          });
+          return;
+        }
+      }
+
+      // 4. Auto-reply/Check-in: Every 15 mins if last message is from user
+      if (lastMessage && lastMessage.role === 'user' && timeSinceLastUserMessage > 15 * 60 * 1000 && !isProcessingRef.current) {
+        const checkInMessage: TrainerMessage = {
+          role: 'model',
+          text: "I'm still here! Do you have any other questions or is there anything else you need help with?",
+          timestamp: new Date().toISOString()
+        };
+        await updateDoc(sessionRef, { 
+          messages: [...session.messages, checkInMessage],
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+        return;
+      }
+
+      // 5. General Auto-reply for unanswered messages (1 min check)
+      if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current && timeSinceLastUserMessage > 60000) {
         console.log('Auto-reply check: Last message was from user, triggering reply...');
         getAIResponse(session.messages);
       }
@@ -91,7 +162,9 @@ Process:
    - For Multiple Choice questions, use this EXACT format at the end of your message:
      OPTIONS: ["Option 1", "Option 2", "Option 3"]
    - First, ask if they prefer to talk in "Hinglish" or "English" (Multiple Choice).
+   - Then, ask if they are "Male" or "Female" (Multiple Choice).
    - Then, ask 3 Multiple Choice questions (e.g., Goal, Activity Level, Diet Preference).
+   - Then, ask how much weight they want to gain or lose (Multiple Choice: e.g., "Gain 2-5kg", "Gain 5-10kg", "Lose 2-5kg", "Lose 5-10kg").
    - Then, ask 3 Written questions (e.g., Medical conditions, Allergies, Daily Routine).
    - Then, ask 3 Multiple Choice questions (e.g., Workout frequency, Equipment access, Budget).
 2. CRITICAL: You must ask for the user's height and weight.
@@ -255,10 +328,12 @@ Current Context:
     try {
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       
-      // Dual API Key Logic
+      // 4 API Key Logic
       const apiKeys = [
         process.env.GEMINI_API_KEY,
-        process.env.GEMINI_API_KEY_2
+        process.env.GEMINI_API_KEY_2,
+        process.env.GEMINI_API_KEY_3,
+        process.env.GEMINI_API_KEY_4
       ].filter(Boolean) as string[];
 
       if (apiKeys.length === 0) {
@@ -298,30 +373,74 @@ Current Context:
       }
 
       if (!success) {
-        aiText = "Just give me a min, I'll answer after 5 mins";
-      }
-      
-      const aiMessage: TrainerMessage = {
-        role: 'model',
-        text: aiText,
-        timestamp: new Date().toISOString()
-      };
+        // API failed - give excuse
+        const excuses = [
+          "Sorry, I'm just driving right now and the signal is a bit weak. Please come back after 30 mins, I'll have your answer ready by then!",
+          "I'm currently in a personal training session with another client. Just give me 30 mins and I'll get back to you!",
+          "I'm just finishing up my own workout. Give me 30 mins and I'll be all yours!",
+          "I'm currently driving to the gym. Please check back in 30 mins, I'll reply then!"
+        ];
+        const excuse = excuses[Math.floor(Math.random() * excuses.length)];
+        
+        const aiMessage: TrainerMessage = {
+          role: 'model',
+          text: excuse,
+          timestamp: new Date().toISOString()
+        };
 
-      await updateDoc(sessionRef, { 
-        messages: [...messages, aiMessage]
-      });
+        await updateDoc(sessionRef, { 
+          messages: [...messages, aiMessage],
+          lastErrorAt: new Date().toISOString(),
+          excuseSentAt: new Date().toISOString(),
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Check if AI response is a plan
+      const isPlan = aiText.toLowerCase().includes('diet plan') || aiText.toLowerCase().includes('workout plan');
+      
+      if (isPlan && !session.isPlanPending && !session.planSent) {
+        // Intercept plan
+        const interceptMessage: TrainerMessage = {
+          role: 'model',
+          text: "I have all the information I need! I will take 1-2 hours designing your personalized diet and workout plan. Please check back after 1-2 hours, it will be ready for you!",
+          timestamp: new Date().toISOString()
+        };
+
+        await updateDoc(sessionRef, { 
+          messages: [...messages, interceptMessage],
+          isPlanPending: true,
+          planPendingAt: new Date().toISOString(),
+          dietPlan: aiText, // Store the actual plan for later
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+      } else {
+        const aiMessage: TrainerMessage = {
+          role: 'model',
+          text: aiText,
+          timestamp: new Date().toISOString()
+        };
+
+        await updateDoc(sessionRef, { 
+          messages: [...messages, aiMessage],
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+      }
 
     } catch (error) {
       console.error('Gemini Error:', error);
-      // Even if everything fails, show the custom message
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       const aiMessage: TrainerMessage = {
         role: 'model',
-        text: "Just give me a min, I'll answer after 5 mins",
+        text: "Sorry, I'm just driving right now and the signal is a bit weak. Please come back after 30 mins, I'll have your answer ready by then!",
         timestamp: new Date().toISOString()
       };
       await updateDoc(sessionRef, { 
-        messages: [...messages, aiMessage]
+        messages: [...messages, aiMessage],
+        lastErrorAt: new Date().toISOString(),
+        excuseSentAt: new Date().toISOString(),
+        lastTrainerMessageAt: new Date().toISOString()
       });
     } finally {
       setIsTyping(false);
@@ -340,30 +459,26 @@ Current Context:
       timestamp: new Date().toISOString()
     };
 
-    // Calculate delay
-    const lastMessage = session.messages[session.messages.length - 1];
-    const timeSinceLastMessage = lastMessage 
-      ? Date.now() - new Date(lastMessage.timestamp).getTime() 
-      : Infinity;
-    
-    const userMessageCount = session.messages.filter(m => m.role === 'user').length;
-    const isFirstReply = userMessageCount === 0;
-    const needsLongDelay = isFirstReply || timeSinceLastMessage > 4 * 60 * 1000;
-    const delay = needsLongDelay ? 120000 : 5000;
-
     const updatedMessages = [...session.messages, userMessage];
     if (!textOverride) setInputText('');
+
+    // Calculate delay
+    const userMessageCount = session.messages.filter(m => m.role === 'user').length;
+    const isFirstMessage = userMessageCount === 0;
     
-    if (needsLongDelay) {
-      setIsConnecting(true);
-    } else {
-      setIsTyping(true);
-    }
+    // First message: 4 mins delay (240000ms)
+    // Subsequent questions: 1 min delay (60000ms)
+    const delay = isFirstMessage ? 240000 : 60000;
+
+    setIsConnecting(true);
 
     try {
       // Update Firestore with user message immediately
       const sessionRef = doc(db, 'trainer_sessions', session.id);
-      await updateDoc(sessionRef, { messages: updatedMessages });
+      await updateDoc(sessionRef, { 
+        messages: updatedMessages,
+        lastUserMessageAt: new Date().toISOString()
+      });
 
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, delay));
