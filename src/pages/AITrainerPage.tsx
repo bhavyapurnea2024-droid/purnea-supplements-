@@ -3,7 +3,7 @@ import { useAuth } from '../AuthContext';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit, increment } from 'firebase/firestore';
 import { TrainerSession, TrainerMessage } from '../types';
-import { AI_TRAINER_PRICE, AI_TRAINER_SESSION_DURATION } from '../constants';
+import { AI_TRAINER_PRICE, AI_TRAINER_SESSION_DURATION, WHATSAPP_NUMBER } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -21,7 +21,8 @@ import {
   AlertCircle,
   IndianRupee,
   Copy,
-  Wallet
+  Wallet,
+  MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -32,11 +33,10 @@ const AITrainerPage = () => {
   const [session, setSession] = useState<TrainerSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<'landing' | 'processing' | 'success'>('landing');
-  const [paymentMethod, setPaymentMethod] = useState<'cashfree' | 'wallet'>('cashfree');
+  const [paymentMethod, setPaymentMethod] = useState<'whatsapp' | 'wallet'>('whatsapp');
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [cashfree, setCashfree] = useState<any>(null);
   const [trainerProfile, setTrainerProfile] = useState({
     name: 'Personal Trainer',
     image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000',
@@ -44,6 +44,21 @@ const AITrainerPage = () => {
   });
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    if (!session || !user) return;
+
+    const interval = setInterval(() => {
+      const lastMessage = session.messages[session.messages.length - 1];
+      if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current) {
+        console.log('Auto-reply check: Last message was from user, triggering reply...');
+        getAIResponse(session.messages);
+      }
+    }, 60000); // 1 minute
+
+    return () => clearInterval(interval);
+  }, [session, user, isTyping, isConnecting]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'trainer'), (snapshot) => {
@@ -57,34 +72,6 @@ const AITrainerPage = () => {
       }
     });
     return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const initCashfree = () => {
-      if ((window as any).Cashfree) {
-        try {
-          const cf = (window as any).Cashfree({
-            mode: process.env.NODE_ENV === "production" ? "production" : "sandbox",
-          });
-          setCashfree(cf);
-          console.log("Cashfree SDK initialized in Trainer Page");
-        } catch (err) {
-          console.error("Error initializing Cashfree SDK:", err);
-        }
-      }
-    };
-
-    if ((window as any).Cashfree) {
-      initCashfree();
-    } else {
-      const interval = setInterval(() => {
-        if ((window as any).Cashfree) {
-          initCashfree();
-          clearInterval(interval);
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
   }, []);
 
   const getTrainerPrompt = (name: string) => `You are "${name}", a professional Indian Fitness & Nutrition Expert. 
@@ -121,10 +108,7 @@ Current Context:
 `;
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
 
     const q = query(
       collection(db, 'trainer_sessions'),
@@ -216,52 +200,139 @@ Current Context:
     }
   };
 
-  const handleCashfreePayment = async () => {
-    if (!user || !cashfree) {
-      toast.error("Payment system not ready. Please refresh.");
-      return;
-    }
+  const handleWhatsAppPayment = async () => {
+    if (!user) return;
     setPaymentStep('processing');
     
     const orderId = `trainer_${Date.now()}`;
 
     try {
-      const response = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderAmount: AI_TRAINER_PRICE,
-          customerId: user.uid,
-          customerPhone: profile?.phoneNumber || '9999999999',
-          customerEmail: user.email,
-          orderId: orderId
-        })
-      });
+      // 1. Save a pending session request in Firestore
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + AI_TRAINER_SESSION_DURATION);
 
-      const data = await response.json();
-      console.log("Trainer Payment Response:", data);
+      const sessionData: any = {
+        userId: user.uid,
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentMethod: 'whatsapp',
+        amount: AI_TRAINER_PRICE,
+        paymentId: orderId,
+        createdAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString(),
+      };
 
-      if (!data.payment_session_id) {
-        const errorMsg = data.message || data.error?.message || 'Failed to create payment session';
-        throw new Error(errorMsg);
+      await addDoc(collection(db, 'trainer_sessions'), sessionData);
+      await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_TRAINER_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for AI Trainer session for ₹${AI_TRAINER_PRICE}`, 'user');
+
+      // 2. Generate WhatsApp message
+      const message = `*Personal Trainer Request*%0A%0A` +
+        `I want to chat with my personal trainer.%0A%0A` +
+        `*User ID:* ${user.uid}%0A` +
+        `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
+        `*Name:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
+        `*Amount:* ₹${AI_TRAINER_PRICE}`;
+
+      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`;
+      
+      // 3. Redirect
+      window.open(whatsappUrl, '_blank');
+      setPaymentStep('success');
+      toast.success("Request sent! Redirecting to WhatsApp...");
+    } catch (error) {
+      console.error("Payment Error:", error);
+      toast.error("Payment initiation failed.");
+      setPaymentStep('landing');
+    }
+  };
+
+  const getAIResponse = async (messages: TrainerMessage[]) => {
+    if (!session || !user || isProcessingRef.current) return;
+    
+    isProcessingRef.current = true;
+    setIsTyping(true);
+
+    try {
+      const sessionRef = doc(db, 'trainer_sessions', session.id);
+      
+      // Dual API Key Logic
+      const apiKeys = [
+        process.env.GEMINI_API_KEY,
+        process.env.GEMINI_API_KEY_2
+      ].filter(Boolean) as string[];
+
+      if (apiKeys.length === 0) {
+        throw new Error('No Gemini API Keys found.');
       }
 
-      // Initiate Cashfree Checkout
-      console.log("Initiating Trainer Checkout with session:", data.payment_session_id);
-      cashfree.checkout({
-        paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self",
+      let aiText = "";
+      let success = false;
+
+      for (const key of apiKeys) {
+        try {
+          const ai = new GoogleGenAI({ apiKey: key });
+          const model = "gemini-flash-latest";
+          
+          const chatHistory = messages.map(m => ({
+            role: m.role === 'user' ? 'user' : 'model',
+            parts: [{ text: m.text }]
+          }));
+
+          const response = await ai.models.generateContent({
+            model,
+            contents: chatHistory,
+            config: {
+              systemInstruction: getTrainerPrompt(trainerProfile.name),
+            }
+          });
+
+          aiText = response.text || "";
+          if (aiText) {
+            success = true;
+            break;
+          }
+        } catch (err) {
+          console.error(`API Key failed:`, err);
+          continue; // Try next key
+        }
+      }
+
+      if (!success) {
+        aiText = "Just give me a min, I'll answer after 5 mins";
+      }
+      
+      const aiMessage: TrainerMessage = {
+        role: 'model',
+        text: aiText,
+        timestamp: new Date().toISOString()
+      };
+
+      await updateDoc(sessionRef, { 
+        messages: [...messages, aiMessage]
       });
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      toast.error(`Payment Error: ${error.message || "Failed to initiate payment"}`);
-      setPaymentStep('landing');
+
+    } catch (error) {
+      console.error('Gemini Error:', error);
+      // Even if everything fails, show the custom message
+      const sessionRef = doc(db, 'trainer_sessions', session.id);
+      const aiMessage: TrainerMessage = {
+        role: 'model',
+        text: "Just give me a min, I'll answer after 5 mins",
+        timestamp: new Date().toISOString()
+      };
+      await updateDoc(sessionRef, { 
+        messages: [...messages, aiMessage]
+      });
+    } finally {
+      setIsTyping(false);
+      setIsConnecting(false);
+      isProcessingRef.current = false;
     }
   };
 
   const sendMessage = async (textOverride?: string) => {
     const textToSend = textOverride || inputText;
-    if (!textToSend.trim() || !session || !user) return;
+    if (!textToSend.trim() || !session || !user || isProcessingRef.current) return;
 
     const userMessage: TrainerMessage = {
       role: 'user',
@@ -297,45 +368,11 @@ Current Context:
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, delay));
 
-      // Call Gemini
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error('Gemini API Key is missing. Please check your environment settings.');
-      }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      const model = "gemini-3-flash-preview";
-      
-      const chatHistory = updatedMessages.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
-      }));
-
-      const response = await ai.models.generateContent({
-        model,
-        contents: chatHistory,
-        config: {
-          systemInstruction: getTrainerPrompt(trainerProfile.name),
-        }
-      });
-
-      const aiText = response.text || "I'm sorry, I'm having trouble connecting. Could you repeat that?";
-      
-      const aiMessage: TrainerMessage = {
-        role: 'model',
-        text: aiText,
-        timestamp: new Date().toISOString()
-      };
-
-      await updateDoc(sessionRef, { 
-        messages: [...updatedMessages, aiMessage]
-      });
+      // Get AI Response
+      await getAIResponse(updatedMessages);
 
     } catch (error) {
-      console.error('Gemini Error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to get response: ${errorMessage}. Please try again.`);
-    } finally {
+      console.error('Send Message Error:', error);
       setIsTyping(false);
       setIsConnecting(false);
     }
@@ -414,14 +451,14 @@ Current Context:
                     
                     <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
                       <button 
-                        onClick={() => setPaymentMethod('cashfree')}
+                        onClick={() => setPaymentMethod('whatsapp')}
                         className={cn(
                           "flex-1 md:w-48 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2",
-                          paymentMethod === 'cashfree' ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white"
+                          paymentMethod === 'whatsapp' ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white"
                         )}
                       >
-                        <CreditCard className="w-6 h-6 text-orange-600" />
-                        <span className="font-bold text-xs uppercase tracking-widest">Cashfree</span>
+                        <MessageCircle className="w-6 h-6 text-green-600" />
+                        <span className="font-bold text-xs uppercase tracking-widest">WhatsApp</span>
                       </button>
                       <button 
                         onClick={() => setPaymentMethod('wallet')}
@@ -439,7 +476,7 @@ Current Context:
                   </div>
 
                   <button 
-                    onClick={paymentMethod === 'cashfree' ? handleCashfreePayment : handleWalletPayment}
+                    onClick={paymentMethod === 'whatsapp' ? handleWhatsAppPayment : handleWalletPayment}
                     disabled={(paymentMethod === 'wallet' && (profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE)}
                     className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-orange-700 shadow-2xl shadow-orange-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
                   >

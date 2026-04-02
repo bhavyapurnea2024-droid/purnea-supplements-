@@ -15,7 +15,7 @@ const DELIVERY_CHARGE = 40;
 
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1);
@@ -45,8 +45,6 @@ const CheckoutPage = () => {
   }, []);
 
   useEffect(() => {
-    if (authLoading) return;
-    
     if (items.length === 0) {
       navigate('/shop');
     }
@@ -54,42 +52,10 @@ const CheckoutPage = () => {
       toast.error('Please sign in to checkout');
       navigate('/shop');
     }
-  }, [items, user, authLoading, navigate]);
+  }, [items, user, navigate]);
 
   const [paymentStep, setPaymentStep] = useState<'selection' | 'processing' | 'success'>('selection');
-  const [paymentMethod, setPaymentMethod] = useState<'cashfree' | 'wallet'>('cashfree');
-  const [cashfree, setCashfree] = useState<any>(null);
-
-  useEffect(() => {
-    const initCashfree = () => {
-      if ((window as any).Cashfree) {
-        try {
-          // Initialize Cashfree SDK v3
-          const cf = (window as any).Cashfree({
-            mode: process.env.NODE_ENV === "production" ? "production" : "sandbox",
-          });
-          setCashfree(cf);
-          console.log("Cashfree SDK initialized successfully");
-        } catch (err) {
-          console.error("Error initializing Cashfree SDK:", err);
-        }
-      }
-    };
-
-    // If script is already loaded, initialize immediately
-    if ((window as any).Cashfree) {
-      initCashfree();
-    } else {
-      // Otherwise, check periodically or wait for load (since it's in index.html, it should be fast)
-      const interval = setInterval(() => {
-        if ((window as any).Cashfree) {
-          initCashfree();
-          clearInterval(interval);
-        }
-      }, 100);
-      return () => clearInterval(interval);
-    }
-  }, []);
+  const [paymentMethod, setPaymentMethod] = useState<'whatsapp' | 'wallet'>('whatsapp');
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -129,39 +95,15 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleCashfreePayment = async () => {
-    if (!user || !cashfree) {
-      toast.error("Payment system not ready. Please refresh.");
-      return;
-    }
+  const handleWhatsAppPayment = async () => {
+    if (!user) return;
     setLoading(true);
     
     const totalAmount = subtotal - (appliedCoupon?.discount || 0) + DELIVERY_CHARGE;
     const orderId = `order_${Date.now()}`;
 
     try {
-      // 1. Create order on backend
-      const response = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderAmount: totalAmount,
-          customerId: user.uid,
-          customerPhone: address.phone,
-          customerEmail: user.email,
-          orderId: orderId
-        })
-      });
-
-      const data = await response.json();
-      console.log("Backend Response:", data);
-
-      if (!data.payment_session_id) {
-        const errorMsg = data.message || data.error?.message || 'Failed to create payment session';
-        throw new Error(errorMsg);
-      }
-
-      // 2. Save order as 'pending' in Firestore before redirecting
+      // 1. Save order as 'pending' in Firestore before redirecting
       const orderData: any = {
         userId: user.uid,
         items,
@@ -172,6 +114,7 @@ const CheckoutPage = () => {
         commissionAmount: appliedCoupon ? (subtotal * appliedCoupon.commissionRate) : 0,
         status: 'pending',
         paymentStatus: 'pending',
+        paymentMethod: 'whatsapp',
         paymentId: orderId,
         shippingAddress: address,
         createdAt: new Date().toISOString(),
@@ -179,17 +122,31 @@ const CheckoutPage = () => {
       };
       
       await setDoc(doc(db, 'orders', orderId), orderData);
-      await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_PAYMENT', `Initiated payment for order #${orderId.slice(-6)} for ₹${totalAmount}`, 'user');
+      await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for order #${orderId.slice(-6)} for ₹${totalAmount}`, 'user');
 
-      // 3. Initiate Cashfree Checkout
-      console.log("Initiating Cashfree Checkout with session:", data.payment_session_id);
-      cashfree.checkout({
-        paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self",
-      });
-    } catch (error: any) {
-      console.error("Payment Error:", error);
-      toast.error(`Payment Error: ${error.message || "Failed to initiate payment"}`);
+      // 2. Generate WhatsApp message
+      const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+      const message = `*New Order Request*%0A%0A` +
+        `*Order ID:* ${orderId}%0A` +
+        `*Name:* ${address.fullName}%0A` +
+        `*Phone:* ${address.phone}%0A` +
+        `*Address:* ${address.addressLine1}, ${address.city}, ${address.state} - ${address.zipCode}%0A` +
+        `*Items:* ${itemsList}%0A` +
+        `*Coupon Code:* ${appliedCoupon?.code || 'None'}%0A` +
+        `*Total Amount to Pay:* ₹${totalAmount}%0A%0A` +
+        `_Note: I understand there is no Cash on Delivery. Please provide payment details._`;
+
+      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`;
+      
+      // 3. Clear cart and redirect
+      clearCart();
+      window.open(whatsappUrl, '_blank');
+      setPaymentStep('success');
+      toast.success("Order request sent! Redirecting to WhatsApp...");
+    } catch (error) {
+      console.error("Order Error:", error);
+      toast.error("Failed to process order. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -410,22 +367,22 @@ const CheckoutPage = () => {
                     <>
                       <div className="space-y-4">
                         <div 
-                          onClick={() => setPaymentMethod('cashfree')}
+                          onClick={() => setPaymentMethod('whatsapp')}
                           className={cn(
                             "p-6 border-2 rounded-2xl flex items-center justify-between cursor-pointer transition-all",
-                            paymentMethod === 'cashfree' ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200"
+                            paymentMethod === 'whatsapp' ? "border-orange-500 bg-orange-50" : "border-gray-100 hover:border-gray-200"
                           )}
                         >
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                              <CreditCard className="w-6 h-6 text-orange-600" />
+                              <MessageCircle className="w-6 h-6 text-green-600" />
                             </div>
                             <div>
-                              <p className="font-bold text-gray-900">Cashfree Secure Payment</p>
-                              <p className="text-xs text-gray-500">Pay via UPI, Cards, or Netbanking</p>
+                              <p className="font-bold text-gray-900">WhatsApp Order Verification</p>
+                              <p className="text-xs text-gray-500">No Cash on Delivery available</p>
                             </div>
                           </div>
-                          {paymentMethod === 'cashfree' && <CheckCircle2 className="w-6 h-6 text-orange-600" />}
+                          {paymentMethod === 'whatsapp' && <CheckCircle2 className="w-6 h-6 text-orange-600" />}
                         </div>
 
                         <div 
@@ -449,25 +406,25 @@ const CheckoutPage = () => {
                         </div>
                       </div>
 
-                      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                      <div className="bg-orange-50 p-6 rounded-2xl border border-orange-100">
                         <div className="flex items-center gap-3 mb-4">
-                          <ShieldCheck className="w-5 h-5 text-green-600" />
-                          <p className="text-sm font-bold text-gray-900">Secure Payment Processing</p>
+                          <AlertCircle className="w-5 h-5 text-orange-600" />
+                          <p className="text-sm font-bold text-gray-900">No Cash on Delivery (COD)</p>
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                          {paymentMethod === 'cashfree' 
-                            ? 'Your payment is processed securely via Cashfree. We do not store your card details. By clicking "Pay & Place Order", you will be redirected to the Cashfree payment window.'
+                          {paymentMethod === 'whatsapp' 
+                            ? 'We do not offer Cash on Delivery. To complete your order, click "Proceed to Payment" below. You will be redirected to WhatsApp to verify your order and receive payment details.'
                             : 'The total amount will be deducted from your wallet balance. This is an instant payment method.'}
                         </p>
                       </div>
 
                       <div className="flex flex-col gap-4">
                         <button 
-                          onClick={paymentMethod === 'cashfree' ? handleCashfreePayment : handleWalletPayment}
+                          onClick={paymentMethod === 'whatsapp' ? handleWhatsAppPayment : handleWalletPayment}
                           disabled={loading || (paymentMethod === 'wallet' && (profile?.wallet?.withdrawable || 0) < finalTotal)}
                           className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:bg-gray-200 flex items-center justify-center gap-2"
                         >
-                          {loading ? 'Processing...' : `Pay ₹${finalTotal} & Place Order`}
+                          {loading ? 'Processing...' : paymentMethod === 'whatsapp' ? 'Proceed to Payment' : `Pay ₹${finalTotal} & Place Order`}
                         </button>
                       </div>
                     </>

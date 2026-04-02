@@ -373,6 +373,7 @@ const AdminUsers = () => {
   const filteredUsers = users.filter(user => 
     user.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.uid.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (user.phoneNumber && user.phoneNumber.includes(searchQuery))
   );
 
@@ -389,7 +390,7 @@ const AdminUsers = () => {
         <div className="relative w-full md:w-80">
           <input
             type="text"
-            placeholder="Search by name, email or phone..."
+            placeholder="Search by name, email, phone or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-4 pr-4 py-3 bg-white border-2 border-gray-100 rounded-2xl focus:border-orange-500/20 focus:ring-0 transition-all font-bold text-sm"

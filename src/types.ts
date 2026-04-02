@@ -63,6 +63,7 @@ export interface Order {
   referralUserId?: string | null;
   status: OrderStatus;
   paymentStatus: 'pending' | 'completed' | 'failed';
+  paymentMethod?: 'cashfree' | 'wallet' | 'whatsapp';
   paymentId?: string;
   shippingAddress: {
     fullName: string;

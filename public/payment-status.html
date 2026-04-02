@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Status</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .status-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        .success { color: #28a745; }
+        .failure { color: #dc3545; }
+        .processing { color: #6c757d; }
+        .btn {
+            display: inline-block;
+            margin-top: 1.5rem;
+            padding: 0.75rem 1.5rem;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-card">
+        <div id="status-icon" class="status-icon processing">⏳</div>
+        <h2 id="status-text">Verifying Payment...</h2>
+        <p id="order-id-text">Order ID: <span id="order-id"></span></p>
+        <div id="action-btn-container"></div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('order_id');
+
+        if (!orderId) {
+            document.getElementById('status-text').innerText = "Invalid Order ID";
+            document.getElementById('status-icon').innerText = "❌";
+            document.getElementById('status-icon').className = "status-icon failure";
+            document.getElementById('action-btn-container').innerHTML = '<a href="/" class="btn">Go Back</a>';
+        } else {
+            document.getElementById('order-id').innerText = orderId;
+            verifyPayment(orderId);
+        }
+
+        async function verifyPayment(id) {
+            try {
+                const response = await fetch(`/verify-payment/${id}`);
+                const data = await response.json();
+
+                const statusText = document.getElementById('status-text');
+                const statusIcon = document.getElementById('status-icon');
+                const actionBtnContainer = document.getElementById('action-btn-container');
+
+                if (data.status === 'SUCCESS') {
+                    statusText.innerText = "Payment Successful!";
+                    statusIcon.innerText = "✅";
+                    statusIcon.className = "status-icon success";
+                    actionBtnContainer.innerHTML = '<a href="/" class="btn">Home</a>';
+                } else {
+                    statusText.innerText = "Payment Failed or Pending";
+                    statusIcon.innerText = "❌";
+                    statusIcon.className = "status-icon failure";
+                    actionBtnContainer.innerHTML = '<a href="/" class="btn">Try Again</a>';
+                }
+            } catch (error) {
+                console.error("Verification Error:", error);
+                document.getElementById('status-text').innerText = "Verification Failed";
+                document.getElementById('status-icon').innerText = "⚠️";
+                document.getElementById('action-btn-container').innerHTML = '<a href="/" class="btn">Go Back</a>';
+            }
+        }
+    </script>
+</body>
+</html>

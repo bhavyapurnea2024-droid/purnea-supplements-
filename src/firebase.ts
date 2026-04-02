@@ -14,7 +14,7 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || firebaseConfigJson.measurementId,
 };
 
-const firestoreDatabaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfigJson.firestoreDatabaseId;
+const firestoreDatabaseId = firebaseConfigJson.firestoreDatabaseId || import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
 
 // Initialize Firebase SDK
 console.log("Initializing Firebase with project ID:", firebaseConfig.projectId);
@@ -98,9 +98,7 @@ export const logAction = async (userId: string | null | undefined, userEmail: st
 // Connection test
 async function testConnection() {
   try {
-    const dbId = firebaseConfigJson.firestoreDatabaseId;
-    const projId = firebaseConfigJson.projectId;
-    console.log(`Testing Firestore connection [Project: ${projId}, Database: ${dbId}]`);
+    console.log(`[RUNTIME TEST] Project: ${firebaseConfig.projectId}, Database: ${firestoreDatabaseId}`);
     
     // Use getDocFromServer to bypass cache and force a network request
     const testDocRef = doc(db, 'test', 'connection');
@@ -111,7 +109,8 @@ async function testConnection() {
     console.error("Firestore connection test failed:", error);
     if (error instanceof Error) {
       if (error.message.includes('the client is offline')) {
-        console.error("CRITICAL: Firestore client is offline. This usually means the Project ID or Database ID in firebase-applet-config.json is incorrect or the database hasn't been provisioned.");
+        console.error(`CRITICAL: Firestore client is offline. Current Config - Project: ${firebaseConfig.projectId}, Database: ${firestoreDatabaseId}`);
+        console.error("This usually means the Project ID or Database ID in firebase-applet-config.json is incorrect or the database hasn't been provisioned.");
       } else if (error.message.includes('permission-denied')) {
         console.error("Firestore permission denied. Rules might be blocking the test connection.");
       }

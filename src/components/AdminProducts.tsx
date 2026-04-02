@@ -4,17 +4,21 @@ import { db, handleFirestoreError, OperationType, logAction } from '../firebase'
 import { Product } from '../types';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { CATEGORIES, GOALS, DEFAULT_COMMISSION_RATE } from '../constants';
+import ConfirmationModal from './ui/ConfirmationModal';
 
 const AdminProducts = () => {
   const { user: adminUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -72,14 +76,19 @@ const AdminProducts = () => {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, 'products', id));
-      await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'DELETE_PRODUCT', `Deleted product ID: ${id}`, 'admin');
+      await deleteDoc(doc(db, 'products', productToDelete));
+      await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'DELETE_PRODUCT', `Deleted product ID: ${productToDelete}`, 'admin');
       toast.success('Product deleted successfully');
+      setIsDeleteModalOpen(false);
+      setProductToDelete(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `products/${productToDelete}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -163,7 +172,10 @@ const AdminProducts = () => {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => handleDeleteProduct(product.id)}
+                        onClick={() => {
+                          setProductToDelete(product.id);
+                          setIsDeleteModalOpen(true);
+                        }}
                         className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -339,6 +351,19 @@ const AdminProducts = () => {
           </div>
         )}
       </AnimatePresence>
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setProductToDelete(null);
+        }}
+        onConfirm={handleDeleteProduct}
+        title="Delete Product"
+        message="Are you sure you want to delete this product? This action cannot be undone."
+        confirmText="Delete"
+        loading={isDeleting}
+      />
     </div>
   );
 };

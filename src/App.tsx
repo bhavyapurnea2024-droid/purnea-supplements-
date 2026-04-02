@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, User, LogOut, Menu, X, Search, Heart, Package, LayoutDashboard, Wallet, Settings, ShieldCheck, ChevronRight, Star, Plus, Minus, Trash2, CheckCircle2, AlertCircle, ArrowRight, Filter, IndianRupee, Instagram, MessageCircle } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
@@ -7,51 +7,6 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { CartProvider, useCart } from './CartContext';
 import { cn } from './lib/utils';
 import { CATEGORIES, GOALS, MIN_WITHDRAWAL_AMOUNT, WHATSAPP_NUMBER, INSTAGRAM_HANDLE, INSTAGRAM_URL } from './constants';
-
-// Error Boundary Component
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-gray-100">
-            <div className="w-20 h-20 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertCircle className="w-10 h-10" />
-            </div>
-            <h1 className="text-2xl font-black text-gray-900 mb-4 uppercase tracking-tighter">Something went wrong</h1>
-            <p className="text-gray-500 mb-8 text-sm">We encountered an unexpected error. Please try refreshing the page or contact support if the issue persists.</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700 transition-all"
-            >
-              Refresh Page
-            </button>
-            {process.env.NODE_ENV !== 'production' && this.state.error && (
-              <div className="mt-8 p-4 bg-gray-900 rounded-xl text-left overflow-auto max-h-48">
-                <p className="text-red-400 font-mono text-xs whitespace-pre-wrap">{this.state.error.toString()}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 // Pages (to be implemented in separate files or inline for now)
 import HomePage from './pages/HomePage';
@@ -66,6 +21,7 @@ import LoginPage from './pages/LoginPage';
 import AITrainerPage from './pages/AITrainerPage';
 import PaymentStatusPage from './pages/PaymentStatusPage';
 import { LoginModal } from './components/LoginModal';
+import SpecialSaleBanner from './components/SpecialSaleBanner';
 
 const Navbar = () => {
   const { user, profile, isAdmin, logout, setIsLoginModalOpen } = useAuth();
@@ -307,6 +263,7 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans selection:bg-orange-100 selection:text-orange-900">
+      {!isAdminRoute && <SpecialSaleBanner />}
       {!isAdminRoute && <Navbar />}
       <main className="flex-grow">
         <Routes>
@@ -352,14 +309,12 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <Router>
-        <AuthProvider>
-          <CartProvider>
-            <AppContent />
-          </CartProvider>
-        </AuthProvider>
-      </Router>
-    </ErrorBoundary>
+    <Router>
+      <AuthProvider>
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
+      </AuthProvider>
+    </Router>
   );
 }

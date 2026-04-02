@@ -11,7 +11,7 @@ import { cn } from '../lib/utils';
 import { MIN_WITHDRAWAL_AMOUNT } from '../constants';
 
 const MyCampaignPage = () => {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, setIsLoginModalOpen } = useAuth();
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,8 +171,11 @@ const MyCampaignPage = () => {
           </div>
           <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tighter uppercase leading-none">Join MyCampaign</h2>
           <p className="text-gray-500 mb-10 leading-relaxed">Sign in to unlock your unique referral code and start earning {(profile?.customCommissionRate || globalSettings?.defaultCommissionRate || 0.05) * 100}% commission on every friend's purchase.</p>
-          <button className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95">
-            Sign In with Google
+          <button 
+            onClick={() => setIsLoginModalOpen(true)}
+            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95"
+          >
+            Sign In
           </button>
         </div>
       </div>

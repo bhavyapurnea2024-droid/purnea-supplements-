@@ -9,7 +9,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
 const OrderHistoryPage = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, setIsLoginModalOpen } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,8 +44,11 @@ const OrderHistoryPage = () => {
           </div>
           <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tighter uppercase leading-none">Sign in to view orders</h2>
           <p className="text-gray-500 mb-10 leading-relaxed">Please sign in to view your order history and track your current shipments.</p>
-          <button className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95">
-            Sign In with Google
+          <button 
+            onClick={() => setIsLoginModalOpen(true)}
+            className="w-full bg-orange-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95"
+          >
+            Sign In
           </button>
         </div>
       </div>

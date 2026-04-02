@@ -106,10 +106,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (snapshot.exists()) {
             setProfile(snapshot.data() as UserProfile);
           } else {
-            // Check if we have stored info from a custom login attempt
-            // For now, if no profile exists, we'll wait for the user to provide details
-            // or use defaults if they just signed in anonymously without the form.
-            setProfile(null);
+            // If user is authenticated but no profile exists, create one
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              phoneNumber: firebaseUser.phoneNumber || '',
+              isProfileComplete: false,
+              role: (firebaseUser.email === 'piyushpurnea15@gmail.com' || firebaseUser.email === 'prcreations2927@gmail.com' || firebaseUser.email === 'bhavyapurnea2024@gmail.com') ? 'admin' : 'user',
+              couponCode: (firebaseUser.email?.split('@')[0].toUpperCase() || 'USER') + Math.floor(1000 + Math.random() * 9000),
+              commissionRate: DEFAULT_COMMISSION_RATE,
+              customCommissionRate: DEFAULT_COMMISSION_RATE,
+              customDiscountRate: DEFAULT_DISCOUNT_RATE,
+              isCouponDisabled: false,
+              wallet: {
+                pending: 0,
+                withdrawable: 0,
+                totalEarned: 0,
+              },
+              createdAt: new Date().toISOString(),
+            };
+            
+            try {
+              await setDoc(userDocRef, newProfile);
+              setProfile(newProfile);
+            } catch (err) {
+              console.error("Error creating missing profile:", err);
+              setProfile(null);
+            }
           }
           setLoading(false);
         }, (error) => {
@@ -131,9 +155,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const isAdmin = profile?.role === 'admin' || 
-                  profile?.email === 'piyushpurnea15@gmail.com' || 
-                  profile?.email === 'prcreations2927@gmail.com' || 
-                  profile?.email === 'bhavyapurnea2024@gmail.com';
+                  user?.email === 'piyushpurnea15@gmail.com' || 
+                  user?.email === 'prcreations2927@gmail.com' || 
+                  user?.email === 'bhavyapurnea2024@gmail.com';
 
   useEffect(() => {
     if ((profile?.email === 'piyushpurnea15@gmail.com' || profile?.email === 'prcreations2927@gmail.com' || profile?.email === 'bhavyapurnea2024@gmail.com') && profile.role !== 'admin') {

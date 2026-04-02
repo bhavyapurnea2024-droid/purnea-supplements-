@@ -14,7 +14,8 @@ import {
   History, 
   CreditCard,
   MessageSquare,
-  User as UserIcon
+  User as UserIcon,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -29,19 +30,20 @@ import { AdminReferrals, AdminAuditLogs, AdminAnalytics } from '../components/Ad
 import AdminSettings from '../components/AdminSettings';
 import AdminTrainerSessions from '../components/AdminTrainerSessions';
 import AdminTrainerProfile from '../components/AdminTrainerProfile';
+import AdminSpecialSale from '../components/AdminSpecialSale';
 
 const AdminDashboard = () => {
-  const { user, profile, loading: authLoading, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Redirect if not admin
   useEffect(() => {
-    if (!authLoading && profile && profile.role !== 'admin') {
+    if (profile && profile.role !== 'admin') {
       navigate('/');
     }
-  }, [profile, authLoading, navigate]);
+  }, [profile, navigate]);
 
   const sidebarLinks = [
     { name: 'Overview', path: '/admin', icon: LayoutDashboard },
@@ -53,17 +55,9 @@ const AdminDashboard = () => {
     { name: 'Your Trainer Sessions', path: '/admin/trainer-sessions', icon: MessageSquare },
     { name: 'Your Trainer Profile', path: '/admin/trainer-profile', icon: UserIcon },
     { name: 'Analytics', path: '/admin/analytics', icon: TrendingUp },
-    { name: 'Audit Logs', path: '/admin/audit-logs', icon: History },
+    { name: 'Special Sale', path: '/admin/special-sale', icon: Sparkles },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
   ];
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
 
   if (!profile || profile.role !== 'admin') return null;
 
@@ -168,7 +162,7 @@ const AdminDashboard = () => {
               <Route path="trainer-sessions" element={<AdminTrainerSessions />} />
               <Route path="trainer-profile" element={<AdminTrainerProfile />} />
               <Route path="analytics" element={<AdminAnalytics />} />
-              <Route path="audit-logs" element={<AdminAuditLogs />} />
+              <Route path="special-sale" element={<AdminSpecialSale />} />
               <Route path="settings" element={<AdminSettings />} />
             </Routes>
           </div>
