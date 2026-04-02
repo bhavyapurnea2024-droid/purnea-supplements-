@@ -38,6 +38,7 @@ export interface Product {
   rating: number;
   numReviews: number;
   commissionRate?: number; // Custom commission rate for this specific product
+  specialOffer?: string; // Text for special offer badge
   createdAt: string;
 }
 

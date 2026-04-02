@@ -1,10 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight } from 'lucide-react';
 import { CATEGORIES } from '../constants';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const HomePage = () => {
+  const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'category_images'));
+        if (docSnap.exists()) {
+          setCategoryImages(docSnap.data() as Record<string, string>);
+        }
+      } catch (error) {
+        console.error('Error fetching category images:', error);
+      }
+    };
+    fetchImages();
+  }, []);
+
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
@@ -15,7 +33,6 @@ const HomePage = () => {
             alt="Hero Background" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
-            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-transparent"></div>
         </div>
@@ -90,11 +107,10 @@ const HomePage = () => {
               >
                 <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity">
                   <img 
-                    src={`https://picsum.photos/seed/${cat}/300/300`} 
+                    src={categoryImages[cat] || `https://picsum.photos/seed/${cat}/300/300`} 
                     alt={cat} 
                     className="w-full h-full object-cover" 
                     referrerPolicy="no-referrer" 
-                    loading="lazy"
                   />
                 </div>
                 <div className="absolute inset-0 p-6 flex flex-col justify-end">

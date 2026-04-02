@@ -4,21 +4,17 @@ import { db, handleFirestoreError, OperationType, logAction } from '../firebase'
 import { Product } from '../types';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { CATEGORIES, GOALS, DEFAULT_COMMISSION_RATE } from '../constants';
-import ConfirmationModal from './ui/ConfirmationModal';
 
 const AdminProducts = () => {
   const { user: adminUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -31,6 +27,7 @@ const AdminProducts = () => {
     stock: 0,
     images: [''],
     commissionRate: 0.05,
+    specialOffer: '',
   });
 
   useEffect(() => {
@@ -68,7 +65,7 @@ const AdminProducts = () => {
       }
       setIsModalOpen(false);
       setEditingProduct(null);
-      setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: DEFAULT_COMMISSION_RATE });
+      setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: DEFAULT_COMMISSION_RATE, specialOffer: '' });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'products');
     } finally {
@@ -76,19 +73,14 @@ const AdminProducts = () => {
     }
   };
 
-  const handleDeleteProduct = async () => {
-    if (!productToDelete) return;
-    setIsDeleting(true);
+  const handleDeleteProduct = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      await deleteDoc(doc(db, 'products', productToDelete));
-      await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'DELETE_PRODUCT', `Deleted product ID: ${productToDelete}`, 'admin');
+      await deleteDoc(doc(db, 'products', id));
+      await logAction(adminUser!.uid, adminUser!.email, adminUser!.displayName, 'DELETE_PRODUCT', `Deleted product ID: ${id}`, 'admin');
       toast.success('Product deleted successfully');
-      setIsDeleteModalOpen(false);
-      setProductToDelete(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${productToDelete}`);
-    } finally {
-      setIsDeleting(false);
+      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
     }
   };
 
@@ -102,7 +94,7 @@ const AdminProducts = () => {
         <button 
           onClick={() => {
             setEditingProduct(null);
-            setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: 0.05 });
+            setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: 0.05, specialOffer: '' });
             setIsModalOpen(true);
           }}
           className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all flex items-center gap-2"
@@ -164,6 +156,7 @@ const AdminProducts = () => {
                             stock: product.stock,
                             images: product.images,
                             commissionRate: product.commissionRate || 0.05,
+                            specialOffer: product.specialOffer || '',
                           });
                           setIsModalOpen(true);
                         }}
@@ -172,10 +165,7 @@ const AdminProducts = () => {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
-                        onClick={() => {
-                          setProductToDelete(product.id);
-                          setIsDeleteModalOpen(true);
-                        }}
+                        onClick={() => handleDeleteProduct(product.id)}
                         className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -318,6 +308,16 @@ const AdminProducts = () => {
                       />
                     </div>
                     <div>
+                      <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Special Offer Text</label>
+                      <input 
+                        type="text" 
+                        value={formData.specialOffer}
+                        onChange={(e) => setFormData({...formData, specialOffer: e.target.value})}
+                        className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20"
+                        placeholder="e.g. BUY 1 GET 1 FREE"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Image URL</label>
                       <input 
                         type="text" 
@@ -351,19 +351,6 @@ const AdminProducts = () => {
           </div>
         )}
       </AnimatePresence>
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal 
-        isOpen={isDeleteModalOpen}
-        onClose={() => {
-          setIsDeleteModalOpen(false);
-          setProductToDelete(null);
-        }}
-        onConfirm={handleDeleteProduct}
-        title="Delete Product"
-        message="Are you sure you want to delete this product? This action cannot be undone."
-        confirmText="Delete"
-        loading={isDeleting}
-      />
     </div>
   );
 };

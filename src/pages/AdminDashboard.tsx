@@ -15,7 +15,8 @@ import {
   CreditCard,
   MessageSquare,
   User as UserIcon,
-  Sparkles
+  Sparkles,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -31,6 +32,7 @@ import AdminSettings from '../components/AdminSettings';
 import AdminTrainerSessions from '../components/AdminTrainerSessions';
 import AdminTrainerProfile from '../components/AdminTrainerProfile';
 import AdminSpecialSale from '../components/AdminSpecialSale';
+import AdminCategoryImages from '../components/AdminCategoryImages';
 
 const AdminDashboard = () => {
   const { user, profile, logout } = useAuth();
@@ -56,6 +58,7 @@ const AdminDashboard = () => {
     { name: 'Your Trainer Profile', path: '/admin/trainer-profile', icon: UserIcon },
     { name: 'Analytics', path: '/admin/analytics', icon: TrendingUp },
     { name: 'Special Sale', path: '/admin/special-sale', icon: Sparkles },
+    { name: 'Category Images', path: '/admin/category-images', icon: ImageIcon },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
   ];
 
@@ -163,6 +166,7 @@ const AdminDashboard = () => {
               <Route path="trainer-profile" element={<AdminTrainerProfile />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="special-sale" element={<AdminSpecialSale />} />
+              <Route path="category-images" element={<AdminCategoryImages />} />
               <Route path="settings" element={<AdminSettings />} />
             </Routes>
           </div>
