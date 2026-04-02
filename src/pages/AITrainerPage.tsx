@@ -328,11 +328,11 @@ Current Context:
     try {
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       
-      // 4 API Key Logic
+      // 4 API Key Logic - Prioritizing Key 3
       const apiKeys = [
+        process.env.GEMINI_API_KEY_3,
         process.env.GEMINI_API_KEY,
         process.env.GEMINI_API_KEY_2,
-        process.env.GEMINI_API_KEY_3,
         process.env.GEMINI_API_KEY_4
       ].filter(Boolean) as string[];
 
@@ -376,9 +376,9 @@ Current Context:
         // API failed - give excuse
         const excuses = [
           "Sorry, I'm just driving right now and the signal is a bit weak. Please come back after 30 mins, I'll have your answer ready by then!",
-          "I'm currently in a personal training session with another client. Just give me 30 mins and I'll get back to you!",
-          "I'm just finishing up my own workout. Give me 30 mins and I'll be all yours!",
-          "I'm currently driving to the gym. Please check back in 30 mins, I'll reply then!"
+          "I'm currently reviewing another client's diet plan and it's taking a bit longer than expected. Give me 30 mins and I'll get back to you!",
+          "I'm having some network issues where I am right now. Please check back in 30 mins, I'll have your response ready!",
+          "I'm just finishing up some work for a client. Give me 30 mins and I'll be all yours!"
         ];
         const excuse = excuses[Math.floor(Math.random() * excuses.length)];
         
