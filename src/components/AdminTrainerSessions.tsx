@@ -79,6 +79,27 @@ const AdminTrainerSessions = () => {
     }
   };
 
+  const handleDeactivateSession = async (session: TrainerSession) => {
+    if (!session.id) return;
+    
+    setProcessingId(session.id);
+    try {
+      const sessionRef = doc(db, 'trainer_sessions', session.id);
+      await updateDoc(sessionRef, {
+        status: 'expired',
+        deactivatedAt: new Date().toISOString(),
+        deactivatedBy: 'admin'
+      });
+      await logAction('admin', 'admin', 'Admin', 'DEACTIVATE_TRAINER_SESSION', `Deactivated trainer session ${session.id} for user ${session.userId}`, 'admin');
+      toast.success('Session deactivated successfully');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'trainer_sessions');
+      toast.error('Failed to deactivate session');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
@@ -146,6 +167,15 @@ const AdminTrainerSessions = () => {
                           className="bg-orange-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 transition-all disabled:opacity-50"
                         >
                           {processingId === session.id ? '...' : 'Confirm Pay'}
+                        </button>
+                      )}
+                      {session.status === 'active' && (
+                        <button
+                          onClick={() => handleDeactivateSession(session)}
+                          disabled={processingId === session.id}
+                          className="bg-red-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all disabled:opacity-50"
+                        >
+                          {processingId === session.id ? '...' : 'Deactivate'}
                         </button>
                       )}
                       {session.status === 'active' && session.referralUserId && !session.referralPaid && (

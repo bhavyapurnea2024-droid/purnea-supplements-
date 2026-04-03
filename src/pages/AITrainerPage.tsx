@@ -409,7 +409,7 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         const now = new Date().getTime();
         const expiresAt = new Date(latestSession.expiresAt).getTime();
         
-        if (now < expiresAt && latestSession.paymentStatus === 'completed') {
+        if (now < expiresAt && latestSession.paymentStatus === 'completed' && latestSession.status === 'active') {
           setSession(latestSession);
           // Previous session is the next one in the list (if it exists)
           if (allSessions.length > 1) {
@@ -694,36 +694,16 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         excuseSentAt: null
       });
 
-      // Check if AI response is a plan
-      const isPlan = aiText.toLowerCase().includes('diet plan') || aiText.toLowerCase().includes('workout plan');
-      
-      if (isPlan && !session.isPlanPending && !session.planSent) {
-        // Intercept plan
-        const interceptMessage: TrainerMessage = {
-          role: 'model',
-          text: "I have all the information I need! I will take around 1-2 hours to design your personalized diet and workout plan. Please check back after an hour, it will be ready for you!",
-          timestamp: new Date().toISOString()
-        };
+      const aiMessage: TrainerMessage = {
+        role: 'model',
+        text: aiText,
+        timestamp: new Date().toISOString()
+      };
 
-        await updateDoc(sessionRef, { 
-          messages: [...messages, interceptMessage],
-          isPlanPending: true,
-          planPendingAt: new Date().toISOString(),
-          dietPlan: aiText, // Store the actual plan for later
-          lastTrainerMessageAt: new Date().toISOString()
-        });
-      } else {
-        const aiMessage: TrainerMessage = {
-          role: 'model',
-          text: aiText,
-          timestamp: new Date().toISOString()
-        };
-
-        await updateDoc(sessionRef, { 
-          messages: [...messages, aiMessage],
-          lastTrainerMessageAt: new Date().toISOString()
-        });
-      }
+      await updateDoc(sessionRef, { 
+        messages: [...messages, aiMessage],
+        lastTrainerMessageAt: new Date().toISOString()
+      });
 
     } catch (error) {
       console.error('Gemini Error:', error);
@@ -1153,13 +1133,13 @@ FITNESS PROFILE:
               </motion.div>
             );
           })}
-          {isConnecting && (
+          {(isConnecting || isTyping) && (
             <div className="flex gap-4 max-w-[85%]">
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">A</div>
               <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-                    {session.messages.length <= 2 ? "Connecting you to the best trainer..." : "Trainer is typing..."}
+                    wait till your personal trainer replies usually it take within 5 mins
                   </p>
                 </div>
               </div>
