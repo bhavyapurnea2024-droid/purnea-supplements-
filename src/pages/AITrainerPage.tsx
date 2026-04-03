@@ -490,8 +490,8 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         status: 'active',
         paymentStatus: 'completed',
         amount: currentPrice,
-        couponUsed: appliedCoupon?.code,
-        referralUserId: appliedCoupon?.ownerId,
+        couponUsed: appliedCoupon?.code || null,
+        referralUserId: appliedCoupon?.ownerId || null,
         messages: [
           {
             role: 'model',
@@ -564,8 +564,8 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         paymentStatus: 'pending',
         paymentMethod: 'whatsapp',
         amount: currentPrice,
-        couponUsed: appliedCoupon?.code,
-        referralUserId: appliedCoupon?.ownerId,
+        couponUsed: appliedCoupon?.code || null,
+        referralUserId: appliedCoupon?.ownerId || null,
         paymentId: orderId,
         messages: [
           {
@@ -582,13 +582,14 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_TRAINER_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for AI Trainer session for ₹${currentPrice}`, 'user');
 
       // 2. Generate WhatsApp message
-      const message = `*Personal Trainer Request*%0A%0A` +
-        `I want to chat with my personal trainer.%0A%0A` +
-        `*User ID:* ${user.uid}%0A` +
-        `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
+      const message = `*AI Trainer Request*%0A%0A` +
+        `*Request ID:* ${orderId}%0A` +
         `*Name:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
+        `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
+        `*Email:* ${user.email || 'N/A'}%0A` +
         `*Amount:* ₹${currentPrice}%0A` +
-        `${appliedCoupon ? `*Coupon Used:* ${appliedCoupon.code}%0A` : ''}`;
+        `${appliedCoupon ? `*Coupon Used:* ${appliedCoupon.code}%0A` : ''}` +
+        `%0A_I want to start my transformation with ${trainerProfile.name}. Please approve my payment._`;
 
       const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`;
       
@@ -598,6 +599,7 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       } catch (e) {
         window.open(whatsappUrl, '_blank');
       }
+      
       setPaymentStep('success');
       toast.success("Request sent! Redirecting to WhatsApp...");
     } catch (error) {
@@ -989,8 +991,34 @@ FITNESS PROFILE:
               <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-8">
                 <CheckCircle2 className="w-12 h-12" />
               </div>
-              <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-4">Namaste! Payment Successful</h2>
-              <p className="text-gray-500 mb-8">{trainerProfile.name} is waiting for you in the chat.</p>
+              <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-4">
+                {paymentMethod === 'whatsapp' ? 'Request Sent!' : 'Namaste! Payment Successful'}
+              </h2>
+              <p className="text-gray-500 mb-8">
+                {paymentMethod === 'whatsapp' 
+                  ? "We've received your request. Please complete the payment on WhatsApp to start your transformation."
+                  : `${trainerProfile.name} is waiting for you in the chat.`}
+              </p>
+              
+              {paymentMethod === 'whatsapp' && (
+                <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+                  <a 
+                    href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(`Hi, I just initiated a payment for AI Trainer session. My User ID is ${user?.uid}. Please approve my access.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-center gap-2 bg-green-500 text-white py-4 rounded-2xl font-bold text-sm hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    Chat on WhatsApp
+                  </a>
+                  <button 
+                    onClick={() => setPaymentStep('landing')}
+                    className="text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-gray-600 transition-all"
+                  >
+                    Go Back
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
