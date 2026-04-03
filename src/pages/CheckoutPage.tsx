@@ -11,7 +11,7 @@ import { cn } from '../lib/utils';
 import { Order, UserProfile } from '../types';
 import { DEFAULT_DISCOUNT_RATE, DEFAULT_COMMISSION_RATE, WHATSAPP_NUMBER } from '../constants';
 
-const DELIVERY_CHARGE = 40;
+const DELIVERY_CHARGE = 0;
 
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
@@ -140,7 +140,14 @@ const CheckoutPage = () => {
       
       // 3. Clear cart and redirect
       clearCart();
-      window.open(whatsappUrl, '_blank');
+      
+      // Use window.location.href for more reliable redirect in iframes/mobile
+      try {
+        window.location.href = whatsappUrl;
+      } catch (e) {
+        window.open(whatsappUrl, '_blank');
+      }
+      
       setPaymentStep('success');
       toast.success("Order request sent! Redirecting to WhatsApp...");
     } catch (error) {

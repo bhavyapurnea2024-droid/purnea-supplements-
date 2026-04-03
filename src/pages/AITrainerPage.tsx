@@ -523,7 +523,13 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         `%0A_Please check the dashboard for the new session._`;
 
       const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
-      window.open(whatsappUrl, '_blank');
+      
+      // Use window.location.href for more reliable redirect in iframes/mobile
+      try {
+        window.location.href = whatsappUrl;
+      } catch (e) {
+        window.open(whatsappUrl, '_blank');
+      }
 
       setPaymentStep('success');
       toast.success('Payment Successful via Wallet! Your Trainer is ready.');
@@ -587,7 +593,11 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`;
       
       // 3. Redirect
-      window.open(whatsappUrl, '_blank');
+      try {
+        window.location.href = whatsappUrl;
+      } catch (e) {
+        window.open(whatsappUrl, '_blank');
+      }
       setPaymentStep('success');
       toast.success("Request sent! Redirecting to WhatsApp...");
     } catch (error) {
@@ -639,7 +649,7 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       for (const key of apiKeys) {
         try {
           const ai = new GoogleGenAI({ apiKey: key });
-          const model = "gemini-flash-latest";
+          const model = "gemini-3-flash-preview";
           
           const response = await ai.models.generateContent({
             model,
@@ -757,11 +767,11 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
     const lastActivity = session.lastUserActivityAt ? new Date(session.lastUserActivityAt).getTime() : now;
     const isOffline = now - lastActivity > 5 * 60 * 1000;
 
-    // First message: 4 mins delay (240000ms)
-    // Subsequent questions: 1 min delay (60000ms)
-    // If offline > 5 mins: 4 mins delay (240000ms)
-    let delay = isFirstMessage ? 240000 : 60000;
-    if (isOffline) delay = 240000;
+    // First message: 30s delay
+    // Subsequent questions: 10s delay
+    // If offline > 5 mins: 30s delay
+    let delay = isFirstMessage ? 30000 : 10000;
+    if (isOffline) delay = 30000;
 
     setIsConnecting(true);
 
@@ -992,6 +1002,9 @@ FITNESS PROFILE:
   const hoursLeft = Math.max(0, Math.floor(timeLeft / (1000 * 60 * 60)));
   const minutesLeft = Math.max(0, Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60)));
 
+  const userMessageCount = session.messages.filter(m => m.role === 'user').length;
+  const isFirstMessage = userMessageCount === 0;
+
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
       {/* 24h Warning Banner */}
@@ -1098,7 +1111,11 @@ FITNESS PROFILE:
                           onClick={() => {
                             const details = session.messages.find(m => m.role === 'user')?.text || 'No details provided';
                             const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(`*Personal Trainer Escalation*%0A%0A${details}`)}`;
-                            window.open(whatsappUrl, '_blank');
+                            try {
+                              window.location.href = whatsappUrl;
+                            } catch (e) {
+                              window.open(whatsappUrl, '_blank');
+                            }
                           }}
                           className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-green-700 transition-all flex items-center justify-center gap-2"
                         >
@@ -1139,7 +1156,7 @@ FITNESS PROFILE:
               <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-                    wait till your personal trainer replies usually it take within 5 mins
+                    {userMessageCount <= 1 ? "Analyzing your profile & creating your custom plan... usually takes 2-5 mins" : "Trainer is typing... usually takes within 1 min"}
                   </p>
                 </div>
               </div>
