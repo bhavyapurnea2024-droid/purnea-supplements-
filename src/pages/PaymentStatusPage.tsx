@@ -6,7 +6,7 @@ import { db, handleFirestoreError, OperationType, logAction } from '../firebase'
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { toast } from 'sonner';
-import { AI_TRAINER_PRICE, AI_TRAINER_SESSION_DURATION } from '../constants';
+import { AI_TRAINER_BASE_PRICE, AI_TRAINER_SESSION_DURATION } from '../constants';
 
 const PaymentStatusPage = () => {
   const [searchParams] = useSearchParams();
@@ -40,7 +40,7 @@ const PaymentStatusPage = () => {
                 userId: user.uid,
                 status: 'active',
                 paymentStatus: 'completed',
-                amount: AI_TRAINER_PRICE,
+                amount: AI_TRAINER_BASE_PRICE,
                 messages: [
                   {
                     role: 'model',
@@ -52,7 +52,7 @@ const PaymentStatusPage = () => {
                 expiresAt: expiresAt.toISOString(),
               });
 
-              await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_PRICE} (Cashfree Payment)`, 'user');
+              await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_BASE_PRICE} (Cashfree Payment)`, 'user');
               toast.success('Trainer session activated!');
             }
             setStatus('success');

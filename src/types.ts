@@ -133,6 +133,8 @@ export interface TrainerSession {
     gender: string;
     age: string;
     height: string;
+    heightFeet: string;
+    heightInches: string;
     weight: string;
     sleep: string;
     medical: string;
@@ -146,6 +148,9 @@ export interface TrainerSession {
   lastTrainerMessageAt?: string;
   lastUserMessageAt?: string;
   lastUserActivityAt?: string;
+  couponUsed?: string;
+  referralUserId?: string;
+  referralPaid?: boolean;
   createdAt: string;
   expiresAt: string;
 }

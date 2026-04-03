@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit, increment, getDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit, increment, getDoc, getDocs } from 'firebase/firestore';
 import { TrainerSession, TrainerMessage } from '../types';
-import { AI_TRAINER_PRICE, AI_TRAINER_SESSION_DURATION, WHATSAPP_NUMBER } from '../constants';
+import { AI_TRAINER_BASE_PRICE, AI_TRAINER_COUPON_PRICE, AI_TRAINER_SESSION_DURATION, WHATSAPP_NUMBER } from '../constants';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -22,7 +22,9 @@ import {
   IndianRupee,
   Copy,
   Wallet,
-  MessageCircle
+  MessageCircle,
+  Ticket,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -62,6 +64,8 @@ const TrainerForm = ({ onSubmit, isSubmitting }: { onSubmit: (data: any) => void
     gender: '',
     age: '',
     height: '',
+    heightFeet: '',
+    heightInches: '',
     weight: '',
     sleep: '',
     medical: '',
@@ -163,6 +167,14 @@ const TrainerForm = ({ onSubmit, isSubmitting }: { onSubmit: (data: any) => void
           </div>
 
           <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Height (Feet & Inches)</label>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" name="heightFeet" value={formData.heightFeet} onChange={handleChange} placeholder="Feet" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
+              <input type="number" name="heightInches" value={formData.heightInches} onChange={handleChange} placeholder="Inches" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-gray-400">Weight (kg)</label>
             <input type="number" name="weight" value={formData.weight} onChange={handleChange} placeholder="e.g. 70" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
           </div>
@@ -211,6 +223,9 @@ const AITrainerPage = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string, ownerId: string } | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [trainerProfile, setTrainerProfile] = useState({
     name: 'Personal Trainer',
     image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000',
@@ -270,26 +285,24 @@ const AITrainerPage = () => {
         return;
       }
 
-      // 3. Retry AI Response if excuse was sent (check after 15 mins)
-      if (currentSession.excuseSentAt && timeSinceExcuse > 15 * 60 * 1000 && !isProcessingRef.current) {
-        console.log('Retrying AI response after excuse (15 mins)...');
-        // Clear excuseSentAt so we don't keep retrying every minute
-        await updateDoc(sessionRef, { excuseSentAt: null });
+      // 3. Retry AI Response if excuse was sent (check every 20 sec)
+      if (currentSession.excuseSentAt && !isProcessingRef.current) {
+        console.log('Retrying AI response after excuse (20s check)...');
         getAIResponse(currentSession.messages);
       }
 
-      // 4. Retry AI Response if it failed previously (check every 5 mins)
-      if (currentSession.lastErrorAt && timeSinceLastError > 5 * 60 * 1000 && !isProcessingRef.current) {
-        console.log('Retrying AI response after error...');
+      // 4. Retry AI Response if it failed previously (check every 20 sec)
+      if (currentSession.lastErrorAt && !isProcessingRef.current) {
+        console.log('Retrying AI response after error (20s check)...');
         getAIResponse(currentSession.messages);
       }
 
-      // 5. General Auto-reply for unanswered messages (1 min check)
-      if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current && timeSinceLastUserMessage > 60000) {
+      // 5. General Auto-reply for unanswered messages (20s check)
+      if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current && timeSinceLastUserMessage > 20000) {
         console.log('Auto-reply check: Last message was from user, triggering reply...');
         getAIResponse(currentSession.messages);
       }
-    }, 60000); // 1 minute
+    }, 20000); // 20 seconds (as requested)
 
     return () => clearInterval(interval);
   }, [session?.id, user?.uid, isTyping, isConnecting]);
@@ -357,6 +370,12 @@ CRITICAL GUIDELINES:
 9. If you are providing options for the user to click, end your message with:
    OPTIONS: ["Option 1", "Option 2", "Option 3"]
 10. Keep your responses under 500 words unless generating a full plan.
+11. **PERSONALIZATION & EXCLUSIVITY**: 
+    - Explicitly state that this diet and workout plan is specially designed ONLY for them and will not work for anyone else.
+    - If the user tries to provide different height/weight stats mid-conversation or asks for a plan for someone else (friend, family), politely decline. 
+    - Say something like: "I'm sorry, but I can only provide a plan for one person per session as it's highly customized to your specific body metrics. If your friend needs a plan, they should purchase a session from their own account to get accurate results."
+    - Vary your phrasing so you don't sound like a bot. Use different ways to say "no" or "this is only for you" to maintain a human-like persona.
+12. **HUMAN-LIKE VARIATION**: Do not use the exact same phrases for every user. Change your greetings, closing statements, and how you explain things to look like a real human trainer.
 
 Current User Profile:
 - Goal: ${session?.userProfile?.goal || 'Not specified'}
@@ -364,7 +383,7 @@ Current User Profile:
 - Diet: ${session?.userProfile?.dietType || 'Not specified'}
 - Workout Days: ${session?.userProfile?.workoutDays || 'Not specified'}
 - Location: ${session?.userProfile?.workoutLocation || 'Not specified'}
-- Stats: ${session?.userProfile?.age}y, ${session?.userProfile?.height}cm, ${session?.userProfile?.weight}kg
+- Stats: ${session?.userProfile?.age}y, ${session?.userProfile?.height}cm (${session?.userProfile?.heightFeet}'${session?.userProfile?.heightInches}"), ${session?.userProfile?.weight}kg
 - Medical: ${session?.userProfile?.medical || 'None'}
 - PREFERRED LANGUAGE: ${session?.userProfile?.language || 'English'}
 
@@ -421,10 +440,37 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
     }
   }, [session?.messages, isTyping, isConnecting]);
 
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setIsValidatingCoupon(true);
+    try {
+      const q = query(collection(db, 'users'), where('couponCode', '==', couponCode.trim().toUpperCase()));
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const ownerData = snapshot.docs[0].data();
+        setAppliedCoupon({
+          code: couponCode.trim().toUpperCase(),
+          ownerId: snapshot.docs[0].id
+        });
+        toast.success('Coupon applied successfully!');
+      } else {
+        toast.error('Invalid coupon code');
+      }
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      toast.error('Failed to validate coupon');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const currentPrice = appliedCoupon ? AI_TRAINER_COUPON_PRICE : AI_TRAINER_BASE_PRICE;
+
   const handleWalletPayment = async () => {
     if (!user || !profile) return;
     
-    if ((profile.wallet?.withdrawable || 0) < AI_TRAINER_PRICE) {
+    if ((profile.wallet?.withdrawable || 0) < currentPrice) {
       toast.error('Insufficient wallet balance');
       return;
     }
@@ -443,7 +489,9 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         userId: user.uid,
         status: 'active',
         paymentStatus: 'completed',
-        amount: AI_TRAINER_PRICE,
+        amount: currentPrice,
+        couponUsed: appliedCoupon?.code,
+        referralUserId: appliedCoupon?.ownerId,
         messages: [
           {
             role: 'model',
@@ -460,18 +508,19 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       // Deduct from wallet
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        'wallet.withdrawable': increment(-AI_TRAINER_PRICE)
+        'wallet.withdrawable': increment(-currentPrice)
       });
 
-      await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_PRICE} (Wallet Payment)`, 'user');
+      await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${currentPrice} (Wallet Payment)`, 'user');
       
       // Send WhatsApp notification for Wallet Payment
       const whatsappMessage = `*New AI Trainer Session (Wallet Pay)!*%0A%0A` +
         `*User ID:* ${user.uid}%0A` +
         `*Customer:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
         `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
-        `*Amount:* ₹${AI_TRAINER_PRICE}%0A%0A` +
-        `_Please check the dashboard for the new session._`;
+        `*Amount:* ₹${currentPrice}%0A` +
+        `${appliedCoupon ? `*Coupon Used:* ${appliedCoupon.code}%0A` : ''}` +
+        `%0A_Please check the dashboard for the new session._`;
 
       const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
       window.open(whatsappUrl, '_blank');
@@ -508,7 +557,9 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: 'whatsapp',
-        amount: AI_TRAINER_PRICE,
+        amount: currentPrice,
+        couponUsed: appliedCoupon?.code,
+        referralUserId: appliedCoupon?.ownerId,
         paymentId: orderId,
         messages: [
           {
@@ -522,7 +573,7 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       };
 
       await addDoc(collection(db, 'trainer_sessions'), sessionData);
-      await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_TRAINER_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for AI Trainer session for ₹${AI_TRAINER_PRICE}`, 'user');
+      await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_TRAINER_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for AI Trainer session for ₹${currentPrice}`, 'user');
 
       // 2. Generate WhatsApp message
       const message = `*Personal Trainer Request*%0A%0A` +
@@ -530,7 +581,8 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         `*User ID:* ${user.uid}%0A` +
         `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
         `*Name:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
-        `*Amount:* ₹${AI_TRAINER_PRICE}`;
+        `*Amount:* ₹${currentPrice}%0A` +
+        `${appliedCoupon ? `*Coupon Used:* ${appliedCoupon.code}%0A` : ''}`;
 
       const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${message}`;
       
@@ -568,17 +620,27 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
 
       let aiText = "";
       let success = false;
+      let lastError = null;
+
+      // Filter out excuse messages from chat history to "start from where it ended"
+      const excuseTexts = [
+        "I'll be back within 30 mins",
+        "I'm just finishing up a client session right now. I'll get back to you with all the details in about 15-20 minutes! Thanks for your patience.",
+        "Sorry, I'm just in a meeting with my head trainer right now and the network is a bit patchy. I'll have your answer ready in about 30 minutes!"
+      ];
+
+      const chatHistory = messages
+        .filter(m => m.text && !excuseTexts.some(excuse => m.text.includes(excuse)))
+        .map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.text }]
+        }));
 
       for (const key of apiKeys) {
         try {
           const ai = new GoogleGenAI({ apiKey: key });
           const model = "gemini-flash-latest";
           
-          const chatHistory = messages.filter(m => m.text).map(m => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.text }]
-          }));
-
           const response = await ai.models.generateContent({
             model,
             contents: chatHistory,
@@ -595,26 +657,42 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
           }
         } catch (err) {
           console.error(`API Key failed:`, err);
+          lastError = err;
           continue; // Try next key
         }
       }
 
       if (!success) {
-        // API failed - give excuse
-        const aiMessage: TrainerMessage = {
-          role: 'model',
-          text: "I'm just finishing up a client session right now. I'll get back to you with all the details in about 15-20 minutes! Thanks for your patience.",
-          timestamp: new Date().toISOString()
-        };
+        // API failed - give excuse if not already sent
+        const hasExcuse = messages.some(m => m.text.includes("I'll be back within 30 mins"));
+        
+        if (!hasExcuse) {
+          const aiMessage: TrainerMessage = {
+            role: 'model',
+            text: "I'll be back within 30 mins",
+            timestamp: new Date().toISOString()
+          };
 
-        await updateDoc(sessionRef, { 
-          messages: [...messages, aiMessage],
-          lastErrorAt: new Date().toISOString(),
-          excuseSentAt: new Date().toISOString(),
-          lastTrainerMessageAt: new Date().toISOString()
-        });
+          await updateDoc(sessionRef, { 
+            messages: [...messages, aiMessage],
+            lastErrorAt: new Date().toISOString(),
+            excuseSentAt: new Date().toISOString(),
+            lastTrainerMessageAt: new Date().toISOString()
+          });
+        } else {
+          // Just update the error timestamp to keep the retry loop going
+          await updateDoc(sessionRef, { 
+            lastErrorAt: new Date().toISOString()
+          });
+        }
         return;
       }
+
+      // Success! Clear error states
+      await updateDoc(sessionRef, {
+        lastErrorAt: null,
+        excuseSentAt: null
+      });
 
       // Check if AI response is a plan
       const isPlan = aiText.toLowerCase().includes('diet plan') || aiText.toLowerCase().includes('workout plan');
@@ -650,17 +728,26 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
     } catch (error) {
       console.error('Gemini Error:', error);
       const sessionRef = doc(db, 'trainer_sessions', session.id);
-      const aiMessage: TrainerMessage = {
-        role: 'model',
-        text: "Sorry, I'm just in a meeting with my head trainer right now and the network is a bit patchy. I'll have your answer ready in about 30 minutes!",
-        timestamp: new Date().toISOString()
-      };
-      await updateDoc(sessionRef, { 
-        messages: [...messages, aiMessage],
-        lastErrorAt: new Date().toISOString(),
-        excuseSentAt: new Date().toISOString(),
-        lastTrainerMessageAt: new Date().toISOString()
-      });
+      
+      const hasExcuse = messages.some(m => m.text.includes("I'll be back within 30 mins"));
+      
+      if (!hasExcuse) {
+        const aiMessage: TrainerMessage = {
+          role: 'model',
+          text: "I'll be back within 30 mins",
+          timestamp: new Date().toISOString()
+        };
+        await updateDoc(sessionRef, { 
+          messages: [...messages, aiMessage],
+          lastErrorAt: new Date().toISOString(),
+          excuseSentAt: new Date().toISOString(),
+          lastTrainerMessageAt: new Date().toISOString()
+        });
+      } else {
+        await updateDoc(sessionRef, { 
+          lastErrorAt: new Date().toISOString()
+        });
+      }
     } finally {
       setIsTyping(false);
       setIsConnecting(false);
@@ -739,7 +826,7 @@ FITNESS PROFILE:
 - Routine: ${formData.routine}
 - Gender: ${formData.gender}
 - Age: ${formData.age} years
-- Height: ${formData.height} cm
+- Height: ${formData.height} cm (${formData.heightFeet}'${formData.heightInches}")
 - Weight: ${formData.weight} kg
 - Sleep: ${formData.sleep} hours
 - Medical: ${formData.medical}
@@ -815,13 +902,51 @@ FITNESS PROFILE:
                 </div>
 
                 <div className="bg-gray-50 rounded-3xl p-8 flex flex-col gap-8">
+                  {/* Coupon Section */}
+                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 mb-4">
+                      <Ticket className="w-4 h-4" /> Have a coupon code?
+                    </div>
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between bg-green-50 border border-green-100 px-4 py-3 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          <span className="text-sm font-bold text-green-700">Coupon "{appliedCoupon.code}" Applied!</span>
+                        </div>
+                        <button 
+                          onClick={() => setAppliedCoupon(null)}
+                          className="p-1 hover:bg-green-100 rounded-lg text-green-600 transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          placeholder="ENTER CODE"
+                          className="flex-grow bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 ring-orange-500/20 uppercase"
+                        />
+                        <button 
+                          onClick={validateCoupon}
+                          disabled={!couponCode.trim() || isValidatingCoupon}
+                          className="bg-gray-900 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-all disabled:opacity-50"
+                        >
+                          {isValidatingCoupon ? '...' : 'Apply'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex flex-col md:flex-row items-center justify-between gap-8">
                     <div>
                       <div className="flex items-center gap-2 text-orange-600 font-black uppercase tracking-widest text-xs mb-2">
                         <Sparkles className="w-4 h-4" /> Limited Time Offer
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-gray-900">₹{AI_TRAINER_PRICE}</span>
+                        <span className="text-4xl font-black text-gray-900">₹{currentPrice}</span>
                         <span className="text-gray-400 line-through font-bold">₹999</span>
                       </div>
                       <p className="text-sm text-gray-500 font-medium mt-1">Get your personalized plan in minutes.</p>
@@ -840,11 +965,11 @@ FITNESS PROFILE:
                       </button>
                       <button 
                         onClick={() => setPaymentMethod('wallet')}
-                        disabled={(profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE}
+                        disabled={(profile?.wallet?.withdrawable || 0) < currentPrice}
                         className={cn(
                           "flex-1 md:w-48 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2",
                           paymentMethod === 'wallet' ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white",
-                          (profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE && "opacity-50 grayscale cursor-not-allowed"
+                          (profile?.wallet?.withdrawable || 0) < currentPrice && "opacity-50 grayscale cursor-not-allowed"
                         )}
                       >
                         <Wallet className="w-6 h-6 text-orange-600" />
@@ -855,7 +980,7 @@ FITNESS PROFILE:
 
                   <button 
                     onClick={paymentMethod === 'whatsapp' ? handleWhatsAppPayment : handleWalletPayment}
-                    disabled={(paymentMethod === 'wallet' && (profile?.wallet?.withdrawable || 0) < AI_TRAINER_PRICE)}
+                    disabled={(paymentMethod === 'wallet' && (profile?.wallet?.withdrawable || 0) < currentPrice)}
                     className="w-full bg-orange-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-orange-700 shadow-2xl shadow-orange-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
                   >
                     Start My Transformation <ChevronRight className="w-6 h-6" />

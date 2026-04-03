@@ -213,6 +213,8 @@ service cloud.firestore {
              data.paymentStatus in ['pending', 'completed', 'failed'] &&
              data.amount is number &&
              data.messages is list &&
+             (!('couponUsed' in data) || data.couponUsed is string) &&
+             (!('referralUserId' in data) || data.referralUserId is string) &&
              isValidDateString(data.createdAt) &&
              isValidDateString(data.expiresAt);
     }
@@ -255,11 +257,16 @@ service cloud.firestore {
                       (request.resource.data.role == 'user' || isAdmin());
       
       // Update profile: owner can update non-sensitive fields. Admin can update anything.
+      // Allow owner to update wallet ONLY for deductions (purchases)
       allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
                         request.resource.data.role == resource.data.role && 
                         request.resource.data.commissionRate == resource.data.commissionRate &&
                         (!('customCommissionRate' in request.resource.data) || request.resource.data.customCommissionRate == resource.data.customCommissionRate) &&
-                        request.resource.data.wallet == resource.data.wallet) || (isAdmin() && isValidUser(request.resource.data));
+                        (request.resource.data.wallet == resource.data.wallet || 
+                         (request.resource.data.wallet.withdrawable < resource.data.wallet.withdrawable && 
+                          request.resource.data.wallet.pending == resource.data.wallet.pending &&
+                          request.resource.data.wallet.totalEarned == resource.data.wallet.totalEarned))) || 
+                     (isAdmin() && isValidUser(request.resource.data));
     }
 
     match /products/{productId} {
