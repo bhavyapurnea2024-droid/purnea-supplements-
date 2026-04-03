@@ -8,7 +8,7 @@ import { Wallet, TrendingUp, Users, Copy, Share2, ArrowRight, CheckCircle2, Aler
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
-import { MIN_WITHDRAWAL_AMOUNT } from '../constants';
+import { MIN_WITHDRAWAL_AMOUNT, WHATSAPP_NUMBER } from '../constants';
 
 const MyCampaignPage = () => {
   const { user, profile, loading: authLoading, setIsLoginModalOpen } = useAuth();
@@ -107,6 +107,17 @@ const MyCampaignPage = () => {
         createdAt: new Date().toISOString(),
       });
       await logAction(user.uid, user.email || '', user.displayName || '', 'WITHDRAW_REQUEST', `Requested withdrawal of ₹${withdrawAmount} via UPI: ${upiId} (Visible in 12h)`, 'user');
+
+      // Send WhatsApp notification for Withdrawal Request
+      const whatsappMessage = `*New Withdrawal Request!*%0A%0A` +
+        `*User ID:* ${user.uid}%0A` +
+        `*Customer:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
+        `*Amount:* ₹${withdrawAmount}%0A` +
+        `*UPI ID:* ${upiId}%0A%0A` +
+        `_Please process this withdrawal after 12 hours._`;
+
+      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
+      window.open(whatsappUrl, '_blank');
 
       // Deduct from withdrawable balance and save UPI ID
       const userRef = doc(db, 'users', user.uid);

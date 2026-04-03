@@ -37,7 +37,7 @@ const ProductListingPage = () => {
       
       // Client-side search filtering
       const filtered = searchQuery 
-        ? docs.filter(p => p.name.toLowerCase().includes(searchQuery) || p.description.toLowerCase().includes(searchQuery))
+        ? docs.filter(p => p.name?.toLowerCase().includes(searchQuery) || p.description?.toLowerCase().includes(searchQuery))
         : docs;
         
       setProducts(filtered);

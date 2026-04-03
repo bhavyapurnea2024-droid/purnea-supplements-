@@ -123,6 +123,21 @@ export interface TrainerSession {
   dietPlan?: string;
   workoutPlan?: string;
   answers?: Record<string, string>;
+  userProfile?: {
+    goal: string;
+    activityLevel: string;
+    dietType: string;
+    workoutDays: string;
+    workoutLocation: string;
+    routine: string;
+    gender: string;
+    age: string;
+    height: string;
+    weight: string;
+    sleep: string;
+    medical: string;
+    language: string;
+  };
   isPlanPending?: boolean;
   planPendingAt?: string;
   planSent?: boolean;
@@ -130,6 +145,7 @@ export interface TrainerSession {
   excuseSentAt?: string;
   lastTrainerMessageAt?: string;
   lastUserMessageAt?: string;
+  lastUserActivityAt?: string;
   createdAt: string;
   expiresAt: string;
 }

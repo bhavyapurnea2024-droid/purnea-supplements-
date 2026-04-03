@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit, increment } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, orderBy, limit, increment, getDoc } from 'firebase/firestore';
 import { TrainerSession, TrainerMessage } from '../types';
 import { AI_TRAINER_PRICE, AI_TRAINER_SESSION_DURATION, WHATSAPP_NUMBER } from '../constants';
 import { GoogleGenAI } from "@google/genai";
@@ -28,9 +28,183 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import Markdown from 'react-markdown';
 
+const SelectableGrid = ({ options, value, onChange, label }: { options: string[], value: string, onChange: (val: string) => void, label: string }) => (
+  <div className="space-y-3">
+    <label className="text-xs font-black uppercase tracking-widest text-gray-400 block">{label}</label>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(opt)}
+          className={cn(
+            "px-4 py-3 rounded-xl text-sm font-bold text-left transition-all border-2",
+            value === opt 
+              ? "bg-orange-600 text-white border-orange-600 shadow-lg shadow-orange-600/20" 
+              : "bg-gray-50 text-gray-600 border-transparent hover:border-gray-200"
+          )}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const TrainerForm = ({ onSubmit, isSubmitting }: { onSubmit: (data: any) => void, isSubmitting: boolean }) => {
+  const [formData, setFormData] = useState({
+    goal: '',
+    activityLevel: '',
+    dietType: '',
+    workoutDays: '',
+    workoutLocation: '',
+    routine: '',
+    gender: '',
+    age: '',
+    height: '',
+    weight: '',
+    sleep: '',
+    medical: '',
+    language: 'English'
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSelect = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const isFormValid = Object.values(formData).every(val => val.trim() !== '');
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-3xl p-8 shadow-xl border border-gray-100 max-w-2xl mx-auto"
+    >
+      <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-6 flex items-center gap-2">
+        <Sparkles className="w-6 h-6 text-orange-600" /> Complete Your Profile
+      </h2>
+      
+      <div className="space-y-8">
+        <SelectableGrid 
+          label="What is your primary fitness goal?"
+          options={["Fat loss", "Muscle gain", "Maintain weight", "Improve endurance"]}
+          value={formData.goal}
+          onChange={(val) => handleSelect('goal', val)}
+        />
+
+        <SelectableGrid 
+          label="What is your current activity level?"
+          options={[
+            "Sedentary (little to no exercise)",
+            "Lightly active (1–3 days/week)",
+            "Moderately active (3–5 days/week)",
+            "Very active (6–7 days/week)"
+          ]}
+          value={formData.activityLevel}
+          onChange={(val) => handleSelect('activityLevel', val)}
+        />
+
+        <SelectableGrid 
+          label="What type of diet do you follow?"
+          options={["Vegetarian", "Vegan", "Non-vegetarian", "Eggetarian"]}
+          value={formData.dietType}
+          onChange={(val) => handleSelect('dietType', val)}
+        />
+
+        <SelectableGrid 
+          label="How many days per week can you work out?"
+          options={["1–2 days", "3–4 days", "5–6 days", "Every day"]}
+          value={formData.workoutDays}
+          onChange={(val) => handleSelect('workoutDays', val)}
+        />
+
+        <SelectableGrid 
+          label="Where do you prefer to work out?"
+          options={["Gym", "Home", "Outdoor (running, sports)", "Mix of all"]}
+          value={formData.workoutLocation}
+          onChange={(val) => handleSelect('workoutLocation', val)}
+        />
+
+        <SelectableGrid 
+          label="How would you describe your daily routine?"
+          options={[
+            "Mostly sitting (desk job/student)",
+            "Standing/walking job",
+            "Physically demanding job",
+            "Mixed activity"
+          ]}
+          value={formData.routine}
+          onChange={(val) => handleSelect('routine', val)}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Gender</label>
+            <select name="gender" value={formData.gender} onChange={handleChange} className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20">
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Current Age (Years)</label>
+            <input type="number" name="age" value={formData.age} onChange={handleChange} placeholder="e.g. 25" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Height (cm)</label>
+            <input type="number" name="height" value={formData.height} onChange={handleChange} placeholder="e.g. 175" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Weight (kg)</label>
+            <input type="number" name="weight" value={formData.weight} onChange={handleChange} placeholder="e.g. 70" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Sleep (Hours/Night)</label>
+            <input type="number" name="sleep" value={formData.sleep} onChange={handleChange} placeholder="e.g. 8" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-black uppercase tracking-widest text-gray-400">Medical Conditions / Injuries</label>
+          <textarea name="medical" value={formData.medical} onChange={handleChange} placeholder="e.g. None, or Lower back pain" className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 ring-orange-500/20 h-24 resize-none" />
+        </div>
+
+        <SelectableGrid 
+          label="Preferred Communication Language"
+          options={["English", "Hindi", "Hinglish"]}
+          value={formData.language}
+          onChange={(val) => handleSelect('language', val)}
+        />
+
+        <button 
+          onClick={() => onSubmit(formData)}
+          disabled={!isFormValid || isSubmitting}
+          className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? (
+            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>Submit Details <Send className="w-5 h-5" /></>
+          )}
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
 const AITrainerPage = () => {
   const { user, profile } = useAuth();
   const [session, setSession] = useState<TrainerSession | null>(null);
+  const [previousSession, setPreviousSession] = useState<TrainerSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<'landing' | 'processing' | 'success'>('landing');
   const [paymentMethod, setPaymentMethod] = useState<'whatsapp' | 'wallet'>('whatsapp');
@@ -47,42 +221,48 @@ const AITrainerPage = () => {
   const isProcessingRef = useRef(false);
 
   useEffect(() => {
-    if (!session || !user) return;
+    if (!session?.id || !user?.uid) return;
 
     const interval = setInterval(async () => {
       const now = Date.now();
-      const lastMessage = session.messages[session.messages.length - 1];
-      const lastUserMessage = [...session.messages].reverse().find(m => m.role === 'user');
+      // Fetch latest session data to avoid stale closures
+      const sessionDoc = await getDoc(doc(db, 'trainer_sessions', session.id));
+      if (!sessionDoc.exists()) return;
+      const currentSession = sessionDoc.data() as TrainerSession;
+
+      const lastMessage = currentSession.messages[currentSession.messages.length - 1];
+      const lastUserMessage = [...currentSession.messages].reverse().find(m => m.role === 'user');
       
       const timeSinceLastUserMessage = lastUserMessage ? now - new Date(lastUserMessage.timestamp).getTime() : 0;
-      const timeSinceLastError = session.lastErrorAt ? now - new Date(session.lastErrorAt).getTime() : Infinity;
-      const timeSincePlanPending = session.planPendingAt ? now - new Date(session.planPendingAt).getTime() : Infinity;
+      const timeSinceLastError = currentSession.lastErrorAt ? now - new Date(currentSession.lastErrorAt).getTime() : Infinity;
+      const timeSincePlanPending = currentSession.planPendingAt ? now - new Date(currentSession.planPendingAt).getTime() : Infinity;
+      const timeSinceExcuse = currentSession.excuseSentAt ? now - new Date(currentSession.excuseSentAt).getTime() : Infinity;
 
-      const sessionRef = doc(db, 'trainer_sessions', session.id);
+      const sessionRef = doc(db, 'trainer_sessions', currentSession.id);
 
       // 1. Escalation: If no reply for 2 hours due to API failure
-      if (session.lastErrorAt && timeSinceLastError > 2 * 60 * 60 * 1000 && !session.messages.some(m => m.text.includes(WHATSAPP_NUMBER))) {
+      if (currentSession.lastErrorAt && timeSinceLastError > 2 * 60 * 60 * 1000 && !currentSession.messages.some(m => m.text?.includes(WHATSAPP_NUMBER))) {
         const escalationMessage: TrainerMessage = {
           role: 'model',
           text: `I'm deeply sorry for the delay. It seems I'm having some technical issues with my connection today. Please directly message me on WhatsApp at ${WHATSAPP_NUMBER} so I can help you immediately!`,
           timestamp: new Date().toISOString()
         };
         await updateDoc(sessionRef, { 
-          messages: [...session.messages, escalationMessage],
+          messages: [...currentSession.messages, escalationMessage],
           lastTrainerMessageAt: new Date().toISOString()
         });
         return;
       }
 
       // 2. Plan delivery: Send plan after 30 mins of being pending
-      if (session.isPlanPending && !session.planSent && timeSincePlanPending > 30 * 60 * 1000) {
+      if (currentSession.isPlanPending && !currentSession.planSent && timeSincePlanPending > 30 * 60 * 1000) {
         const planMessage: TrainerMessage = {
           role: 'model',
-          text: `Namaste! Your personalized Indian Diet and Workout plan is ready! \n\n${session.dietPlan}`,
+          text: `Namaste! Your personalized Indian Diet and Workout plan is ready! \n\n${currentSession.dietPlan}`,
           timestamp: new Date().toISOString()
         };
         await updateDoc(sessionRef, { 
-          messages: [...session.messages, planMessage],
+          messages: [...currentSession.messages, planMessage],
           planSent: true,
           isPlanPending: false,
           lastTrainerMessageAt: new Date().toISOString()
@@ -90,46 +270,45 @@ const AITrainerPage = () => {
         return;
       }
 
-      // 3. Excuse follow-up: Message after 15 mins of excuse
-      if (session.excuseSentAt && timeSinceLastError > 15 * 60 * 1000 && timeSinceLastError < 20 * 60 * 1000) {
-        const lastMessageIsExcuse = session.messages[session.messages.length - 1].text.includes("driving") || session.messages[session.messages.length - 1].text.includes("session");
-        if (lastMessageIsExcuse) {
-          const followUpMessage: TrainerMessage = {
-            role: 'model',
-            text: "I'm almost there! Just a few more minutes and I'll be ready to help you. Thank you for your patience!",
-            timestamp: new Date().toISOString()
-          };
-          await updateDoc(sessionRef, { 
-            messages: [...session.messages, followUpMessage],
-            lastTrainerMessageAt: new Date().toISOString()
-          });
-          return;
-        }
+      // 3. Retry AI Response if excuse was sent (check after 15 mins)
+      if (currentSession.excuseSentAt && timeSinceExcuse > 15 * 60 * 1000 && !isProcessingRef.current) {
+        console.log('Retrying AI response after excuse (15 mins)...');
+        // Clear excuseSentAt so we don't keep retrying every minute
+        await updateDoc(sessionRef, { excuseSentAt: null });
+        getAIResponse(currentSession.messages);
       }
 
-      // 4. Auto-reply/Check-in: Every 15 mins if last message is from user
-      if (lastMessage && lastMessage.role === 'user' && timeSinceLastUserMessage > 15 * 60 * 1000 && !isProcessingRef.current) {
-        const checkInMessage: TrainerMessage = {
-          role: 'model',
-          text: "I'm still here! Do you have any other questions or is there anything else you need help with?",
-          timestamp: new Date().toISOString()
-        };
-        await updateDoc(sessionRef, { 
-          messages: [...session.messages, checkInMessage],
-          lastTrainerMessageAt: new Date().toISOString()
-        });
-        return;
+      // 4. Retry AI Response if it failed previously (check every 5 mins)
+      if (currentSession.lastErrorAt && timeSinceLastError > 5 * 60 * 1000 && !isProcessingRef.current) {
+        console.log('Retrying AI response after error...');
+        getAIResponse(currentSession.messages);
       }
 
       // 5. General Auto-reply for unanswered messages (1 min check)
       if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current && timeSinceLastUserMessage > 60000) {
         console.log('Auto-reply check: Last message was from user, triggering reply...');
-        getAIResponse(session.messages);
+        getAIResponse(currentSession.messages);
       }
     }, 60000); // 1 minute
 
     return () => clearInterval(interval);
-  }, [session, user, isTyping, isConnecting]);
+  }, [session?.id, user?.uid, isTyping, isConnecting]);
+
+  // Track user activity for "offline" logic
+  useEffect(() => {
+    const updateActivity = async () => {
+      if (!session || !user) return;
+      const sessionRef = doc(db, 'trainer_sessions', session.id);
+      await updateDoc(sessionRef, { lastUserActivityAt: new Date().toISOString() });
+    };
+
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+    return () => {
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keydown', updateActivity);
+    };
+  }, [session?.id, user?.uid]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'trainer'), (snapshot) => {
@@ -145,39 +324,51 @@ const AITrainerPage = () => {
     return () => unsub();
   }, []);
 
-  const getTrainerPrompt = (name: string) => `You are "${name}", a professional Indian Fitness & Nutrition Expert. 
-Your goal is to provide a highly personalized Indian Diet and Workout plan.
+  const getTrainerPrompt = (name: string, previousPlan?: string) => `You are "${name}", a professional Indian Fitness & Nutrition Expert. 
+Your goal is to provide a highly personalized Indian Diet and Workout plan based on the detailed profile provided by the user.
 
-Persona:
-- Professional, empathetic, and encouraging.
-- Use VERY SIMPLE words. Avoid complex jargon.
-- Ask questions ONE BY ONE. Never ask more than one question in a single message.
-- Expert in Indian cuisine (Dal, Roti, Sabzi, Paneer, Chicken Curry, etc.).
-- Understands Indian lifestyle (long working hours, vegetarian/non-vegetarian preferences).
-- Speaks clearly and professionally, like a real person.
+${previousPlan ? `PREVIOUS PLAN CONTEXT:
+The user has a previous plan from a past session:
+${previousPlan}
 
-Process:
-1. You MUST follow a strict questioning sequence to understand the user:
-   - Ask questions one by one.
-   - For Multiple Choice questions, use this EXACT format at the end of your message:
-     OPTIONS: ["Option 1", "Option 2", "Option 3"]
-   - First, ask if they prefer to talk in "Hinglish" or "English" (Multiple Choice).
-   - Then, ask if they are "Male" or "Female" (Multiple Choice).
-   - Then, ask 3 Multiple Choice questions (e.g., Goal, Activity Level, Diet Preference).
-   - Then, ask how much weight they want to gain or lose (Multiple Choice: e.g., "Gain 2-5kg", "Gain 5-10kg", "Lose 2-5kg", "Lose 5-10kg").
-   - Then, ask 3 Written questions (e.g., Medical conditions, Allergies, Daily Routine).
-   - Then, ask 3 Multiple Choice questions (e.g., Workout frequency, Equipment access, Budget).
-2. CRITICAL: You must ask for the user's height and weight.
-3. Once you have enough information, generate a comprehensive 7-day Indian Diet Plan and a Workout Plan.
-4. WORKOUT REQUIREMENTS: Every exercise MUST include specific Sets and Reps (e.g., 3 Sets of 12 Reps).
-5. DIET REQUIREMENTS: Every food item MUST include measurements in GRAMS (e.g., 100g Paneer, 50g Oats).
-6. Suggest specific products from "Purnea Supplements" (like Whey Protein, Creatine, Multivitamins) where they fit naturally. 
-   - CRITICAL: When suggesting a supplement, ALWAYS include a link to it using this format: [Product Name](/products). For example: [Whey Protein](/products).
-7. Remind the user to COPY their plan because it will vanish after 24 hours.
+If the user is returning for a follow-up (after 2 weeks), your goal is to:
+1. Ask them about the changes they've noticed in their body (weight, energy, strength, etc.).
+2. Make SLIGHT adjustments to this previous plan based on their feedback.
+3. DO NOT change everything; focus on small tweaks to keep them on track.
+` : ''}
 
-Current Context:
-- User is paying ₹149 for this 24-hour access.
-- All food recommendations must be Indian.
+CRITICAL GUIDELINES:
+1. BE CONCISE. Avoid long introductions or fluff. Get straight to the point.
+2. Use Indian foods (Paneer, Dal, Roti, Poha, Idli, etc.) and specify quantities in grams or bowls.
+3. For workouts, specify Exercises, Sets, and Reps clearly.
+4. If the user asks for a plan, provide a detailed one.
+5. Always include relevant product links from Purnea Supps if they help the user's goal:
+   - Whey Protein: /product/whey-protein
+   - Creatine: /product/creatine
+   - Pre-workout: /product/pre-workout
+   - Multivitamin: /product/multivitamin
+   - Fish Oil: /product/fish-oil
+6. Format your response using Markdown.
+7. **IMPORTANT**: When you deliver a full diet or workout plan, ALWAYS tell the user that they should follow this plan for 2 weeks and then come back for a slight adjustment to keep their progress optimal.
+8. **FOLLOW-UP LOGIC**: If a user mentions they are returning after 2 weeks or that this is a follow-up session:
+   - Ask them about the changes they've noticed in their body (weight, energy, strength, etc.).
+   - Make SLIGHT adjustments to their current plan based on their feedback.
+   - DO NOT change everything; focus on small tweaks to keep them on track.
+9. If you are providing options for the user to click, end your message with:
+   OPTIONS: ["Option 1", "Option 2", "Option 3"]
+10. Keep your responses under 500 words unless generating a full plan.
+
+Current User Profile:
+- Goal: ${session?.userProfile?.goal || 'Not specified'}
+- Activity: ${session?.userProfile?.activityLevel || 'Not specified'}
+- Diet: ${session?.userProfile?.dietType || 'Not specified'}
+- Workout Days: ${session?.userProfile?.workoutDays || 'Not specified'}
+- Location: ${session?.userProfile?.workoutLocation || 'Not specified'}
+- Stats: ${session?.userProfile?.age}y, ${session?.userProfile?.height}cm, ${session?.userProfile?.weight}kg
+- Medical: ${session?.userProfile?.medical || 'None'}
+- PREFERRED LANGUAGE: ${session?.userProfile?.language || 'English'}
+
+You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "Hinglish", use a mix of Hindi and English written in Latin script.
 `;
 
   useEffect(() => {
@@ -187,23 +378,32 @@ Current Context:
       collection(db, 'trainer_sessions'),
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc'),
-      limit(1)
+      limit(5)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
-        const sessionData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as TrainerSession;
-        // Check if session is still active (within 24h)
-        const now = new Date().getTime();
-        const expiresAt = new Date(sessionData.expiresAt).getTime();
+        const allSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TrainerSession));
+        const latestSession = allSessions[0];
         
-        if (now < expiresAt && sessionData.paymentStatus === 'completed') {
-          setSession(sessionData);
+        // Check if latest session is still active (within 24h)
+        const now = new Date().getTime();
+        const expiresAt = new Date(latestSession.expiresAt).getTime();
+        
+        if (now < expiresAt && latestSession.paymentStatus === 'completed') {
+          setSession(latestSession);
+          // Previous session is the next one in the list (if it exists)
+          if (allSessions.length > 1) {
+            setPreviousSession(allSessions[1]);
+          }
         } else {
           setSession(null);
+          // If no active session, the latest one IS the previous session
+          setPreviousSession(latestSession);
         }
       } else {
         setSession(null);
+        setPreviousSession(null);
       }
       setLoading(false);
     }, (error) => {
@@ -235,6 +435,10 @@ Current Context:
       const now = new Date();
       const expiresAt = new Date(now.getTime() + AI_TRAINER_SESSION_DURATION);
 
+      const initialMessage = previousSession 
+        ? `Namaste ${profile?.displayName || 'Friend'}! Welcome back! I see we worked together on a plan previously. I'm excited to help you with your 2-week follow-up and make the necessary adjustments to your plan. \n\nPlease fill out the form below with your current stats so I can see your progress and update your plan!`
+        : `Namaste ${profile?.displayName || 'Friend'}! I am ${trainerProfile.name}. I'm honored to help you on your fitness journey. To create the perfect Indian diet and workout plan for you, I need to understand you better. \n\nPlease fill out the form below so I can get started on your transformation!`;
+
       const sessionData: Omit<TrainerSession, 'id'> = {
         userId: user.uid,
         status: 'active',
@@ -243,7 +447,7 @@ Current Context:
         messages: [
           {
             role: 'model',
-            text: `Namaste ${profile?.displayName || 'Friend'}! I am ${trainerProfile.name}. I'm honored to help you on your fitness journey. To create the perfect Indian diet and workout plan for you, I need to understand you better. \n\nFirst, would you like to talk in **Hinglish** or **English**?`,
+            text: initialMessage,
             timestamp: new Date().toISOString()
           }
         ],
@@ -261,6 +465,17 @@ Current Context:
 
       await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_PRICE} (Wallet Payment)`, 'user');
       
+      // Send WhatsApp notification for Wallet Payment
+      const whatsappMessage = `*New AI Trainer Session (Wallet Pay)!*%0A%0A` +
+        `*User ID:* ${user.uid}%0A` +
+        `*Customer:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
+        `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
+        `*Amount:* ₹${AI_TRAINER_PRICE}%0A%0A` +
+        `_Please check the dashboard for the new session._`;
+
+      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${whatsappMessage}`;
+      window.open(whatsappUrl, '_blank');
+
       setPaymentStep('success');
       toast.success('Payment Successful via Wallet! Your Trainer is ready.');
       
@@ -284,6 +499,10 @@ Current Context:
       const now = new Date();
       const expiresAt = new Date(now.getTime() + AI_TRAINER_SESSION_DURATION);
 
+      const initialMessage = previousSession 
+        ? `Namaste ${profile?.displayName || 'Friend'}! Welcome back! I see we worked together on a plan previously. I'm excited to help you with your 2-week follow-up and make the necessary adjustments to your plan. \n\nPlease fill out the form below with your current stats so I can see your progress and update your plan!`
+        : `Namaste ${profile?.displayName || 'Friend'}! I am ${trainerProfile.name}. I'm honored to help you on your fitness journey. To create the perfect Indian diet and workout plan for you, I need to understand you better. \n\nPlease fill out the form below so I can get started on your transformation!`;
+
       const sessionData: any = {
         userId: user.uid,
         status: 'pending',
@@ -291,6 +510,13 @@ Current Context:
         paymentMethod: 'whatsapp',
         amount: AI_TRAINER_PRICE,
         paymentId: orderId,
+        messages: [
+          {
+            role: 'model',
+            text: initialMessage,
+            timestamp: new Date().toISOString()
+          }
+        ],
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
       };
@@ -348,7 +574,7 @@ Current Context:
           const ai = new GoogleGenAI({ apiKey: key });
           const model = "gemini-flash-latest";
           
-          const chatHistory = messages.map(m => ({
+          const chatHistory = messages.filter(m => m.text).map(m => ({
             role: m.role === 'user' ? 'user' : 'model',
             parts: [{ text: m.text }]
           }));
@@ -357,7 +583,8 @@ Current Context:
             model,
             contents: chatHistory,
             config: {
-              systemInstruction: getTrainerPrompt(trainerProfile.name),
+              systemInstruction: getTrainerPrompt(trainerProfile.name, previousSession?.dietPlan),
+              maxOutputTokens: 2048,
             }
           });
 
@@ -374,17 +601,9 @@ Current Context:
 
       if (!success) {
         // API failed - give excuse
-        const excuses = [
-          "Sorry, I'm just driving right now and the signal is a bit weak. Please come back after 30 mins, I'll have your answer ready by then!",
-          "I'm currently reviewing another client's diet plan and it's taking a bit longer than expected. Give me 30 mins and I'll get back to you!",
-          "I'm having some network issues where I am right now. Please check back in 30 mins, I'll have your response ready!",
-          "I'm just finishing up some work for a client. Give me 30 mins and I'll be all yours!"
-        ];
-        const excuse = excuses[Math.floor(Math.random() * excuses.length)];
-        
         const aiMessage: TrainerMessage = {
           role: 'model',
-          text: excuse,
+          text: "I'm just finishing up a client session right now. I'll get back to you with all the details in about 15-20 minutes! Thanks for your patience.",
           timestamp: new Date().toISOString()
         };
 
@@ -404,7 +623,7 @@ Current Context:
         // Intercept plan
         const interceptMessage: TrainerMessage = {
           role: 'model',
-          text: "I have all the information I need! I will take 1-2 hours designing your personalized diet and workout plan. Please check back after 1-2 hours, it will be ready for you!",
+          text: "I have all the information I need! I will take around 1-2 hours to design your personalized diet and workout plan. Please check back after an hour, it will be ready for you!",
           timestamp: new Date().toISOString()
         };
 
@@ -433,7 +652,7 @@ Current Context:
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       const aiMessage: TrainerMessage = {
         role: 'model',
-        text: "Sorry, I'm just driving right now and the signal is a bit weak. Please come back after 30 mins, I'll have your answer ready by then!",
+        text: "Sorry, I'm just in a meeting with my head trainer right now and the network is a bit patchy. I'll have your answer ready in about 30 minutes!",
         timestamp: new Date().toISOString()
       };
       await updateDoc(sessionRef, { 
@@ -466,9 +685,16 @@ Current Context:
     const userMessageCount = session.messages.filter(m => m.role === 'user').length;
     const isFirstMessage = userMessageCount === 0;
     
+    // Offline check: if last activity was > 5 mins ago
+    const now = Date.now();
+    const lastActivity = session.lastUserActivityAt ? new Date(session.lastUserActivityAt).getTime() : now;
+    const isOffline = now - lastActivity > 5 * 60 * 1000;
+
     // First message: 4 mins delay (240000ms)
     // Subsequent questions: 1 min delay (60000ms)
-    const delay = isFirstMessage ? 240000 : 60000;
+    // If offline > 5 mins: 4 mins delay (240000ms)
+    let delay = isFirstMessage ? 240000 : 60000;
+    if (isOffline) delay = 240000;
 
     setIsConnecting(true);
 
@@ -477,7 +703,8 @@ Current Context:
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       await updateDoc(sessionRef, { 
         messages: updatedMessages,
-        lastUserMessageAt: new Date().toISOString()
+        lastUserMessageAt: new Date().toISOString(),
+        lastUserActivityAt: new Date().toISOString()
       });
 
       // Wait for the specified delay
@@ -491,6 +718,35 @@ Current Context:
       setIsTyping(false);
       setIsConnecting(false);
     }
+  };
+
+  const handleFormSubmit = async (formData: any) => {
+    if (!session || !user) return;
+    
+    // Update session with user profile
+    const sessionRef = doc(db, 'trainer_sessions', session.id);
+    await updateDoc(sessionRef, {
+      userProfile: formData
+    });
+
+    const formattedAnswers = `
+FITNESS PROFILE:
+- Goal: ${formData.goal}
+- Activity Level: ${formData.activityLevel}
+- Diet Type: ${formData.dietType}
+- Workout Days: ${formData.workoutDays}
+- Location: ${formData.workoutLocation}
+- Routine: ${formData.routine}
+- Gender: ${formData.gender}
+- Age: ${formData.age} years
+- Height: ${formData.height} cm
+- Weight: ${formData.weight} kg
+- Sleep: ${formData.sleep} hours
+- Medical: ${formData.medical}
+- Preferred Language: ${formData.language}
+    `.trim();
+
+    await sendMessage(formattedAnswers);
   };
 
   if (loading) {
@@ -527,7 +783,7 @@ Current Context:
               </div>
 
               <div className="p-12">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
                   <div className="space-y-4">
                     <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center">
                       <Utensils className="w-6 h-6" />
@@ -548,6 +804,13 @@ Current Context:
                     </div>
                     <h3 className="font-black text-gray-900 uppercase tracking-tight">24h Expert Access</h3>
                     <p className="text-sm text-gray-500 leading-relaxed">Talk to {trainerProfile.name} anytime for 24 hours to refine and adjust your plans instantly.</p>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-black text-gray-900 uppercase tracking-tight">2-Week Updates</h3>
+                    <p className="text-sm text-gray-500 leading-relaxed">We optimize your plan every 2 weeks based on your body's response for consistent results.</p>
                   </div>
                 </div>
 
@@ -665,11 +928,22 @@ Current Context:
         className="flex-grow overflow-y-auto p-4 sm:p-8 scroll-smooth"
       >
         <div className="max-w-4xl mx-auto space-y-8">
+          {session.messages.length === 1 && session.messages[0]?.role === 'model' && (
+            <TrainerForm onSubmit={handleFormSubmit} isSubmitting={isConnecting} />
+          )}
+
           {session.messages.map((msg, i) => {
+            if (!msg.text) return null;
+            
+            // Skip the first message if we are showing the form, or show it above the form
+            // Actually, let's show the first message then the form
             const optionsMatch = msg.text.match(/OPTIONS:\s*(\[.*\])/);
             const options = optionsMatch ? JSON.parse(optionsMatch[1]) : null;
             const cleanText = msg.text.replace(/OPTIONS:\s*\[.*\]/, '').trim();
             const isPlan = msg.text.toLowerCase().includes('diet plan') || msg.text.toLowerCase().includes('workout plan');
+            
+            // Check if this is an escalation message with WhatsApp link
+            const isEscalation = msg.text.includes(WHATSAPP_NUMBER);
 
             return (
               <motion.div 
@@ -712,6 +986,22 @@ Current Context:
                     <div className="prose prose-sm max-w-none prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit prose-ul:text-inherit">
                       <Markdown>{cleanText}</Markdown>
                     </div>
+                    
+                    {isEscalation && (
+                      <div className="mt-6">
+                        <button 
+                          onClick={() => {
+                            const details = session.messages.find(m => m.role === 'user')?.text || 'No details provided';
+                            const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent(`*Personal Trainer Escalation*%0A%0A${details}`)}`;
+                            window.open(whatsappUrl, '_blank');
+                          }}
+                          className="w-full bg-green-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          <MessageCircle className="w-5 h-5" /> Connect via WhatsApp
+                        </button>
+                      </div>
+                    )}
+
                     <p className={cn(
                       "text-[10px] mt-4 font-bold uppercase tracking-widest opacity-40",
                       msg.role === 'user' ? "text-right" : ""
@@ -744,7 +1034,7 @@ Current Context:
               <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
                 <div className="flex flex-col gap-3">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-                    Connecting you to the best trainer...
+                    {session.messages.length <= 2 ? "Connecting you to the best trainer..." : "Trainer is typing..."}
                   </p>
                 </div>
               </div>
@@ -757,23 +1047,25 @@ Current Context:
       {/* Chat Input */}
       <div className="bg-white border-t border-gray-100 p-4 sm:p-8 sticky bottom-0">
         <div className="max-w-4xl mx-auto">
-          <div className="relative flex items-center gap-4">
-            <input 
-              type="text" 
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder={`Type your message to ${trainerProfile.name}...`}
-              className="flex-grow bg-gray-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 ring-orange-500/20 transition-all"
-            />
-            <button 
-              onClick={() => sendMessage()}
-              disabled={!inputText.trim() || isTyping || isConnecting}
-              className="bg-orange-600 text-white p-4 rounded-2xl hover:bg-orange-700 transition-all active:scale-95 disabled:bg-gray-200 disabled:scale-100"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
+          {session.messages.length > 1 && (
+            <div className="relative flex items-center gap-4">
+              <input 
+                type="text" 
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder={`Type your message to ${trainerProfile.name}...`}
+                className="flex-grow bg-gray-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 ring-orange-500/20 transition-all"
+              />
+              <button 
+                onClick={() => sendMessage()}
+                disabled={!inputText.trim() || isTyping || isConnecting}
+                className="bg-orange-600 text-white p-4 rounded-2xl hover:bg-orange-700 transition-all active:scale-95 disabled:bg-gray-200 disabled:scale-100"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          )}
           <p className="text-[10px] text-center text-gray-400 font-bold uppercase tracking-widest mt-4">
             {trainerProfile.name} will help you with Indian Diet & Workout Plans
           </p>

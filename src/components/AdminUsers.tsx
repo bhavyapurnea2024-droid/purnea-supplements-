@@ -62,7 +62,7 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
     if (!window.confirm('Are you sure you want to regenerate this coupon code? The old code will no longer work.')) return;
     setIsRegenerating(true);
     try {
-      const newCode = (user.displayName.split(' ')[0].toUpperCase() || 'USER') + Math.floor(1000 + Math.random() * 9000);
+      const newCode = (user.displayName?.split(' ')[0]?.toUpperCase() || 'USER') + Math.floor(1000 + Math.random() * 9000);
       await updateDoc(doc(db, 'users', user.uid), { couponCode: newCode });
       setManualCoupon(newCode);
       toast.success(`New coupon code generated: ${newCode}`);
@@ -371,9 +371,9 @@ const AdminUsers = () => {
   };
 
   const filteredUsers = users.filter(user => 
-    user.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.uid.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.uid?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (user.phoneNumber && user.phoneNumber.includes(searchQuery))
   );
 

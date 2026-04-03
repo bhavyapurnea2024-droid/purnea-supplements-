@@ -169,12 +169,23 @@ const Navbar = () => {
               ))}
               <div className="pt-4 border-t border-gray-50">
                 {user ? (
-                  <button 
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 text-red-600 font-bold"
-                  >
-                    <LogOut className="w-5 h-5" /> Sign Out
-                  </button>
+                  <div className="space-y-4">
+                    {isAdmin && (
+                      <Link 
+                        to="/admin" 
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center gap-2 text-lg font-bold text-orange-600"
+                      >
+                        <ShieldCheck className="w-5 h-5" /> Admin Panel
+                      </Link>
+                    )}
+                    <button 
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 text-red-600 font-bold"
+                    >
+                      <LogOut className="w-5 h-5" /> Sign Out
+                    </button>
+                  </div>
                 ) : (
                   <button 
                     onClick={() => {
