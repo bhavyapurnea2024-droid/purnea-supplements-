@@ -221,7 +221,6 @@ const AITrainerPage = () => {
   const [paymentStep, setPaymentStep] = useState<'landing' | 'processing' | 'success'>('landing');
   const [paymentMethod, setPaymentMethod] = useState<'whatsapp' | 'wallet'>('whatsapp');
   const [inputText, setInputText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string, ownerId: string } | null>(null);
@@ -247,72 +246,112 @@ const AITrainerPage = () => {
 
       const lastMessage = currentSession.messages[currentSession.messages.length - 1];
       const lastUserMessage = [...currentSession.messages].reverse().find(m => m.role === 'user');
+      const lastTrainerMessage = [...currentSession.messages].reverse().find(m => m.role === 'model');
       
       const timeSinceLastUserMessage = lastUserMessage ? now - new Date(lastUserMessage.timestamp).getTime() : 0;
-      const timeSinceLastError = currentSession.lastErrorAt ? now - new Date(currentSession.lastErrorAt).getTime() : Infinity;
+      const timeSinceLastTrainerMessage = lastTrainerMessage ? now - new Date(lastTrainerMessage.timestamp).getTime() : 0;
       const timeSincePlanPending = currentSession.planPendingAt ? now - new Date(currentSession.planPendingAt).getTime() : Infinity;
-      const timeSinceExcuse = currentSession.excuseSentAt ? now - new Date(currentSession.excuseSentAt).getTime() : Infinity;
+      const timeSinceLastActivity = currentSession.lastUserActivityAt ? now - new Date(currentSession.lastUserActivityAt).getTime() : Infinity;
 
       const sessionRef = doc(db, 'trainer_sessions', currentSession.id);
 
-      // 1. Escalation: If no reply for 2 hours due to API failure
-      if (currentSession.lastErrorAt && timeSinceLastError > 2 * 60 * 60 * 1000 && !currentSession.messages.some(m => m.text?.includes(WHATSAPP_NUMBER))) {
-        const escalationMessage: TrainerMessage = {
-          role: 'model',
-          text: `I'm deeply sorry for the delay. It seems I'm having some technical issues with my connection today. Please directly message me on WhatsApp at ${WHATSAPP_NUMBER} so I can help you immediately!`,
-          timestamp: new Date().toISOString()
-        };
-        await updateDoc(sessionRef, { 
-          messages: [...currentSession.messages, escalationMessage],
-          lastTrainerMessageAt: new Date().toISOString()
-        });
+      // 1. Plan generation & delivery: within 5 mins (4.5 mins for human-like timing)
+      if (currentSession.isPlanPending && !currentSession.planSent) {
+        // If plan not generated yet, generate it
+        if (!currentSession.dietPlan && !isProcessingRef.current) {
+          generatePlan(currentSession);
+          return;
+        }
+
+        // If plan generated, wait for 5 mins to send
+        if (currentSession.dietPlan && timeSincePlanPending > 4.5 * 60 * 1000) {
+          const planMessage: TrainerMessage = {
+            role: 'model',
+            text: `Namaste! Your personalized Indian Diet and Workout plan is ready! \n\n${currentSession.dietPlan}`,
+            timestamp: new Date().toISOString()
+          };
+          await updateDoc(sessionRef, { 
+            messages: [...currentSession.messages, planMessage],
+            planSent: true,
+            planSentAt: new Date().toISOString(),
+            isPlanPending: false,
+            isFirstReply: true, // Next interaction will be "first reply" (2 mins)
+            lastTrainerMessageAt: new Date().toISOString()
+          });
+          return;
+        }
+      }
+
+      // 2. Inactivity Reset: If no messages for > 5 mins
+      if (timeSinceLastUserMessage > 5 * 60 * 1000 && timeSinceLastTrainerMessage > 5 * 60 * 1000 && currentSession.isFirstReply === false) {
+        await updateDoc(sessionRef, { isFirstReply: true });
         return;
       }
 
-      // 2. Plan delivery: Send plan after 30 mins of being pending
-      if (currentSession.isPlanPending && !currentSession.planSent && timeSincePlanPending > 30 * 60 * 1000) {
-        const planMessage: TrainerMessage = {
-          role: 'model',
-          text: `Namaste! Your personalized Indian Diet and Workout plan is ready! \n\n${currentSession.dietPlan}`,
-          timestamp: new Date().toISOString()
-        };
-        await updateDoc(sessionRef, { 
-          messages: [...currentSession.messages, planMessage],
-          planSent: true,
-          isPlanPending: false,
-          lastTrainerMessageAt: new Date().toISOString()
-        });
-        return;
-      }
+      // 3. AI Response Logic
+      if (lastMessage && lastMessage.role === 'user' && !isProcessingRef.current) {
+        const isFirst = currentSession.isFirstReply !== false;
+        const delay = isFirst ? 2 * 60 * 1000 : 5000;
 
-      // 3. Retry AI Response if excuse was sent (check every 20 sec)
-      if (currentSession.excuseSentAt && !isProcessingRef.current) {
-        console.log('Retrying AI response after excuse (20s check)...');
-        getAIResponse(currentSession.messages);
+        if (timeSinceLastUserMessage >= delay) {
+          getAIResponse(currentSession.messages);
+        }
       }
-
-      // 4. Retry AI Response if it failed previously (check every 20 sec)
-      if (currentSession.lastErrorAt && !isProcessingRef.current) {
-        console.log('Retrying AI response after error (20s check)...');
-        getAIResponse(currentSession.messages);
-      }
-
-      // 5. General Auto-reply for unanswered messages (20s check)
-      if (lastMessage && lastMessage.role === 'user' && !isTyping && !isConnecting && !isProcessingRef.current && timeSinceLastUserMessage > 20000) {
-        console.log('Auto-reply check: Last message was from user, triggering reply...');
-        getAIResponse(currentSession.messages);
-      }
-    }, 20000); // 20 seconds (as requested)
+    }, 5000); // Check every 5 seconds for strict timing
 
     return () => clearInterval(interval);
-  }, [session?.id, user?.uid, isTyping, isConnecting]);
+  }, [session?.id, user?.uid, isConnecting]);
 
-  // Track user activity for "offline" logic
+  const generatePlan = async (currentSession: TrainerSession) => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    try {
+      const apiKeys = [process.env.GEMINI_API_KEY_3].filter(Boolean) as string[];
+      if (apiKeys.length === 0) return;
+
+      const ai = new GoogleGenAI({ apiKey: apiKeys[0] });
+      const model = "gemini-3-flash-preview";
+      
+      const prompt = `Based on the user profile, generate a detailed Indian Diet and Workout plan. 
+      Format it clearly using Markdown. 
+      Only return the plan content, no other text.`;
+
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: getTrainerPrompt(trainerProfile.name, previousSession?.dietPlan),
+          maxOutputTokens: 2048,
+        }
+      });
+
+      const planText = response.text || "";
+      if (planText) {
+        const sessionRef = doc(db, 'trainer_sessions', currentSession.id);
+        await updateDoc(sessionRef, { dietPlan: planText });
+      }
+    } catch (error) {
+      console.error('Generate Plan Error:', error);
+    } finally {
+      isProcessingRef.current = false;
+    }
+  };
+
+  // Track user activity for "offline" logic - Throttled to prevent quota exhaustion
   useEffect(() => {
+    let lastUpdate = 0;
     const updateActivity = async () => {
       if (!session || !user) return;
-      const sessionRef = doc(db, 'trainer_sessions', session.id);
-      await updateDoc(sessionRef, { lastUserActivityAt: new Date().toISOString() });
+      const now = Date.now();
+      if (now - lastUpdate < 60000) return; // Only update once per minute
+      
+      lastUpdate = now;
+      try {
+        const sessionRef = doc(db, 'trainer_sessions', session.id);
+        await updateDoc(sessionRef, { lastUserActivityAt: new Date().toISOString() });
+      } catch (e) {
+        console.error("Activity update failed:", e);
+      }
     };
 
     window.addEventListener('mousemove', updateActivity);
@@ -438,7 +477,7 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       const container = chatContainerRef.current;
       container.scrollTop = container.scrollHeight;
     }
-  }, [session?.messages, isTyping, isConnecting]);
+  }, [session?.messages, isConnecting]);
 
   const validateCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -448,14 +487,23 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       const snapshot = await getDocs(q);
       
       if (!snapshot.empty) {
-        const ownerData = snapshot.docs[0].data();
-        setAppliedCoupon({
-          code: couponCode.trim().toUpperCase(),
-          ownerId: snapshot.docs[0].id
-        });
-        toast.success('Coupon applied successfully!');
+        const couponOwner = snapshot.docs[0].data();
+        if (couponOwner.isCouponDisabled) {
+          toast.error('This coupon code is currently disabled');
+          setAppliedCoupon(null);
+        } else if (couponOwner.uid === user?.uid) {
+          toast.error('You cannot use your own coupon code');
+          setAppliedCoupon(null);
+        } else {
+          setAppliedCoupon({
+            code: couponCode.trim().toUpperCase(),
+            ownerId: snapshot.docs[0].id
+          });
+          toast.success('Coupon applied successfully!');
+        }
       } else {
         toast.error('Invalid coupon code');
+        setAppliedCoupon(null);
       }
     } catch (error) {
       console.error('Error validating coupon:', error);
@@ -612,18 +660,18 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
   const getAIResponse = async (messages: TrainerMessage[]) => {
     if (!session || !user || isProcessingRef.current) return;
     
+    // Check if AI is enabled for this session
+    if (session.isAiEnabled === false) {
+      return;
+    }
+    
     isProcessingRef.current = true;
-    setIsTyping(true);
 
     try {
       const sessionRef = doc(db, 'trainer_sessions', session.id);
       
-      // 4 API Key Logic - Prioritizing Key 3
       const apiKeys = [
-        process.env.GEMINI_API_KEY_3,
-        process.env.GEMINI_API_KEY,
-        process.env.GEMINI_API_KEY_2,
-        process.env.GEMINI_API_KEY_4
+        process.env.GEMINI_API_KEY_3
       ].filter(Boolean) as string[];
 
       if (apiKeys.length === 0) {
@@ -632,17 +680,15 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
 
       let aiText = "";
       let success = false;
-      let lastError = null;
 
-      // Filter out excuse messages from chat history to "start from where it ended"
-      const excuseTexts = [
-        "I'll be back within 30 mins",
-        "I'm just finishing up a client session right now. I'll get back to you with all the details in about 15-20 minutes! Thanks for your patience.",
-        "Sorry, I'm just in a meeting with my head trainer right now and the network is a bit patchy. I'll have your answer ready in about 30 minutes!"
+      // Filter out fallback messages from chat history
+      const fallbackTexts = [
+        "The trainer will reply shortly. It usually takes 5–10 minutes.",
+        "I'll be back within 30 mins"
       ];
 
       const chatHistory = messages
-        .filter(m => m.text && !excuseTexts.some(excuse => m.text.includes(excuse)))
+        .filter(m => m.text && !fallbackTexts.some(fallback => m.text.includes(fallback)))
         .map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
           parts: [{ text: m.text }]
@@ -669,30 +715,30 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
           }
         } catch (err) {
           console.error(`API Key failed:`, err);
-          lastError = err;
           continue; // Try next key
         }
       }
 
       if (!success) {
-        // API failed - give excuse if not already sent
-        const hasExcuse = messages.some(m => m.text.includes("I'll be back within 30 mins"));
+        // API failed - send fallback message
+        const hasFallback = messages.some(m => m.text.includes("The trainer will reply shortly"));
         
-        if (!hasExcuse) {
-          const aiMessage: TrainerMessage = {
+        if (!hasFallback) {
+          const fallbackMessage: TrainerMessage = {
             role: 'model',
-            text: "I'll be back within 30 mins",
+            text: "The trainer will reply shortly. It usually takes 5–10 minutes.",
             timestamp: new Date().toISOString()
           };
 
           await updateDoc(sessionRef, { 
-            messages: [...messages, aiMessage],
+            messages: [...messages, fallbackMessage],
             lastErrorAt: new Date().toISOString(),
-            excuseSentAt: new Date().toISOString(),
             lastTrainerMessageAt: new Date().toISOString()
           });
+          
+          // Also log for admin monitoring
+          await logAction(user.uid, user.email || '', user.displayName || '', 'TRAINER_API_FAILURE', 'AI Trainer API failed, sent fallback message to client', 'admin');
         } else {
-          // Just update the error timestamp to keep the retry loop going
           await updateDoc(sessionRef, { 
             lastErrorAt: new Date().toISOString()
           });
@@ -703,7 +749,8 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
       // Success! Clear error states
       await updateDoc(sessionRef, {
         lastErrorAt: null,
-        excuseSentAt: null
+        excuseSentAt: null,
+        isFirstReply: false // Set to false after successful reply
       });
 
       const aiMessage: TrainerMessage = {
@@ -719,29 +766,7 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
 
     } catch (error) {
       console.error('Gemini Error:', error);
-      const sessionRef = doc(db, 'trainer_sessions', session.id);
-      
-      const hasExcuse = messages.some(m => m.text.includes("I'll be back within 30 mins"));
-      
-      if (!hasExcuse) {
-        const aiMessage: TrainerMessage = {
-          role: 'model',
-          text: "I'll be back within 30 mins",
-          timestamp: new Date().toISOString()
-        };
-        await updateDoc(sessionRef, { 
-          messages: [...messages, aiMessage],
-          lastErrorAt: new Date().toISOString(),
-          excuseSentAt: new Date().toISOString(),
-          lastTrainerMessageAt: new Date().toISOString()
-        });
-      } else {
-        await updateDoc(sessionRef, { 
-          lastErrorAt: new Date().toISOString()
-        });
-      }
     } finally {
-      setIsTyping(false);
       setIsConnecting(false);
       isProcessingRef.current = false;
     }
@@ -760,21 +785,6 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
     const updatedMessages = [...session.messages, userMessage];
     if (!textOverride) setInputText('');
 
-    // Calculate delay
-    const userMessageCount = session.messages.filter(m => m.role === 'user').length;
-    const isFirstMessage = userMessageCount === 0;
-    
-    // Offline check: if last activity was > 5 mins ago
-    const now = Date.now();
-    const lastActivity = session.lastUserActivityAt ? new Date(session.lastUserActivityAt).getTime() : now;
-    const isOffline = now - lastActivity > 5 * 60 * 1000;
-
-    // First message: 30s delay
-    // Subsequent questions: 10s delay
-    // If offline > 5 mins: 30s delay
-    let delay = isFirstMessage ? 30000 : 10000;
-    if (isOffline) delay = 30000;
-
     setIsConnecting(true);
 
     try {
@@ -786,15 +796,11 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
         lastUserActivityAt: new Date().toISOString()
       });
 
-      // Wait for the specified delay
-      await new Promise(resolve => setTimeout(resolve, delay));
-
-      // Get AI Response
-      await getAIResponse(updatedMessages);
+      // The useEffect interval will handle the AI response timing (2min or 5sec)
+      setIsConnecting(false);
 
     } catch (error) {
       console.error('Send Message Error:', error);
-      setIsTyping(false);
       setIsConnecting(false);
     }
   };
@@ -802,10 +808,12 @@ You MUST respond in the PREFERRED LANGUAGE specified above. If the language is "
   const handleFormSubmit = async (formData: any) => {
     if (!session || !user) return;
     
-    // Update session with user profile
+    // Update session with user profile and set plan pending
     const sessionRef = doc(db, 'trainer_sessions', session.id);
     await updateDoc(sessionRef, {
-      userProfile: formData
+      userProfile: formData,
+      isPlanPending: true,
+      planPendingAt: new Date().toISOString()
     });
 
     const formattedAnswers = `
@@ -1166,7 +1174,6 @@ FITNESS PROFILE:
                         <button
                           key={idx}
                           onClick={() => sendMessage(opt)}
-                          disabled={isTyping}
                           className="bg-orange-50 hover:bg-orange-100 text-orange-600 px-4 py-2 rounded-xl text-xs font-bold border border-orange-200 transition-all active:scale-95 disabled:opacity-50"
                         >
                           {opt}
@@ -1178,18 +1185,6 @@ FITNESS PROFILE:
               </motion.div>
             );
           })}
-          {(isConnecting || isTyping) && (
-            <div className="flex gap-4 max-w-[85%]">
-              <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">A</div>
-              <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-gray-100 shadow-sm">
-                <div className="flex flex-col gap-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-                    {userMessageCount <= 1 ? "Analyzing your profile & creating your custom plan... usually takes 2-5 mins" : "Trainer is typing... usually takes within 1 min"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
           <div ref={chatEndRef} />
         </div>
       </div>
@@ -1209,7 +1204,7 @@ FITNESS PROFILE:
               />
               <button 
                 onClick={() => sendMessage()}
-                disabled={!inputText.trim() || isTyping || isConnecting}
+                disabled={!inputText.trim() || isConnecting}
                 className="bg-orange-600 text-white p-4 rounded-2xl hover:bg-orange-700 transition-all active:scale-95 disabled:bg-gray-200 disabled:scale-100"
               >
                 <Send className="w-5 h-5" />

@@ -143,6 +143,8 @@ export interface TrainerSession {
   isPlanPending?: boolean;
   planPendingAt?: string;
   planSent?: boolean;
+  planSentAt?: string;
+  isFirstReply?: boolean;
   lastErrorAt?: string;
   excuseSentAt?: string;
   lastTrainerMessageAt?: string;
@@ -151,6 +153,7 @@ export interface TrainerSession {
   couponUsed?: string;
   referralUserId?: string;
   referralPaid?: boolean;
+  isAiEnabled?: boolean;
   createdAt: string;
   expiresAt: string;
 }

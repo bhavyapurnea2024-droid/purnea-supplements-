@@ -213,8 +213,12 @@ service cloud.firestore {
              data.paymentStatus in ['pending', 'completed', 'failed'] &&
              data.amount is number &&
              data.messages is list &&
-             (!('couponUsed' in data) || data.couponUsed is string) &&
-             (!('referralUserId' in data) || data.referralUserId is string) &&
+             (!('couponUsed' in data) || data.couponUsed is string || data.couponUsed == null) &&
+             (!('referralUserId' in data) || data.referralUserId is string || data.referralUserId == null) &&
+             (!('isAiEnabled' in data) || data.isAiEnabled is bool) &&
+             (!('lastTrainerMessageAt' in data) || isValidDateString(data.lastTrainerMessageAt)) &&
+             (!('lastUserMessageAt' in data) || isValidDateString(data.lastUserMessageAt)) &&
+             (!('lastUserActivityAt' in data) || isValidDateString(data.lastUserActivityAt)) &&
              isValidDateString(data.createdAt) &&
              isValidDateString(data.expiresAt);
     }
@@ -258,6 +262,7 @@ service cloud.firestore {
       
       // Update profile: owner can update non-sensitive fields. Admin can update anything.
       // Allow owner to update wallet ONLY for deductions (purchases)
+      // Also allow any authenticated user to increment wallet.pending and wallet.totalEarned (for referral commissions)
       allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
                         request.resource.data.role == resource.data.role && 
                         request.resource.data.commissionRate == resource.data.commissionRate &&
@@ -266,6 +271,12 @@ service cloud.firestore {
                          (request.resource.data.wallet.withdrawable < resource.data.wallet.withdrawable && 
                           request.resource.data.wallet.pending == resource.data.wallet.pending &&
                           request.resource.data.wallet.totalEarned == resource.data.wallet.totalEarned))) || 
+                     (isAuthenticated() && 
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wallet', 'updatedAt']) &&
+                        request.resource.data.wallet.withdrawable == resource.data.wallet.withdrawable &&
+                        request.resource.data.wallet.pending > resource.data.wallet.pending &&
+                        request.resource.data.wallet.totalEarned > resource.data.wallet.totalEarned &&
+                        request.resource.data.role == resource.data.role) ||
                      (isAdmin() && isValidUser(request.resource.data));
     }
 
