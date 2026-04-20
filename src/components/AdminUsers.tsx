@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { X, TrendingUp, RefreshCw, Shield, User as UserIcon, Dumbbell } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { DEFAULT_COMMISSION_RATE, DEFAULT_DISCOUNT_RATE } from '../constants';
+import { DEFAULT_COMMISSION_RATE, DEFAULT_DISCOUNT_RATE, CATEGORIES } from '../constants';
 
 const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -86,6 +86,23 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
     try {
       await updateDoc(doc(db, 'users', user.uid), { customDiscountRate: rate });
       toast.success('Custom discount rate updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    }
+  };
+
+  const toggleCategoryRestriction = async (category: string) => {
+    const current = user.allowedCouponCategories || [];
+    let updated;
+    if (current.includes(category)) {
+      updated = current.filter(c => c !== category);
+    } else {
+      updated = [...current, category];
+    }
+    
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { allowedCouponCategories: updated });
+      toast.success(`Category ${category} ${current.includes(category) ? 'removed' : 'added'} to restrictions`);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     }
@@ -233,6 +250,35 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
                   >
                     {user.isCouponDisabled ? 'Enable' : 'Disable'}
                   </button>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h5 className="text-xs font-black text-gray-400 uppercase tracking-widest">Category Restrictions</h5>
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4 shadow-sm">
+                  <p className="text-sm font-bold text-gray-900">Allowed Categories</p>
+                  <p className="text-[10px] text-gray-500 mb-2 font-medium uppercase tracking-wider leading-relaxed">
+                    If none selected, coupon works on all categories. If selected, it ONLY works for those categories.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {CATEGORIES.map((cat) => {
+                      const isActive = user.allowedCouponCategories?.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => toggleCategoryRestriction(cat)}
+                          className={cn(
+                            "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2",
+                            isActive 
+                              ? "bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-600/20" 
+                              : "bg-white border-gray-100 text-gray-400 hover:border-gray-200"
+                          )}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

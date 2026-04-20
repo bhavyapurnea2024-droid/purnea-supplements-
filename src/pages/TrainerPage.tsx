@@ -156,6 +156,14 @@ const TrainerPage = () => {
           setReferralUserId(null);
           setIsCouponValid(false);
         } else {
+          const allowedCategories = couponOwner.allowedCouponCategories || [];
+          if (allowedCategories.length > 0 && !allowedCategories.includes('Trainer Program')) {
+            toast.error('This coupon is not valid for the Trainer Program');
+            setReferralUserId(null);
+            setIsCouponValid(false);
+            return;
+          }
+          
           setReferralUserId(couponOwner.uid);
           setIsCouponValid(true);
           toast.success(`Coupon applied! Price reduced to ₹${TRAINER_DISCOUNTED_PRICE}.`);

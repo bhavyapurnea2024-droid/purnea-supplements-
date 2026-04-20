@@ -14,6 +14,7 @@ export interface UserProfile {
   customDiscountRate?: number; // Override discount rate for users using this coupon
   isBlocked?: boolean;
   isCouponDisabled?: boolean;
+  allowedCouponCategories?: string[];
   password?: string;
   upiId?: string;
   wallet: {

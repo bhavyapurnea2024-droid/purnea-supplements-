@@ -5,6 +5,8 @@ export const CATEGORIES = [
   'Vitamins',
   'Weight Gainers',
   'Fat Burners',
+  'Oats',
+  'Trainer Program',
 ];
 
 export const GOALS = [

@@ -21,7 +21,13 @@ const CheckoutPage = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; userId: string; discount: number; commissionRate: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ 
+    code: string; 
+    userId: string; 
+    discount: number; 
+    commissionRate: number;
+    applicableSubtotal: number;
+  } | null>(null);
   
   const [address, setAddress] = useState({
     fullName: user?.displayName || '',
@@ -78,14 +84,30 @@ const CheckoutPage = () => {
         } else {
           const commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || DEFAULT_COMMISSION_RATE;
           const discountRate = couponOwner.customDiscountRate || globalSettings?.defaultDiscountRate || DEFAULT_DISCOUNT_RATE;
-          const discount = subtotal * discountRate;
+          const allowedCategories = couponOwner.allowedCouponCategories || [];
+          
+          let applicableSubtotal = 0;
+          items.forEach(item => {
+            if (allowedCategories.length === 0 || allowedCategories.includes(item.category)) {
+              applicableSubtotal += item.price * item.quantity;
+            }
+          });
+
+          if (applicableSubtotal === 0) {
+            toast.error(`This coupon is only valid for categories: ${allowedCategories.join(', ')}`);
+            setAppliedCoupon(null);
+            return;
+          }
+
+          const discount = applicableSubtotal * discountRate;
           setAppliedCoupon({
             code: couponCode.toUpperCase(),
             userId: couponOwner.uid,
             discount,
-            commissionRate
+            commissionRate,
+            applicableSubtotal
           });
-          toast.success(`Coupon applied! ${(discountRate * 100).toFixed(0)}% discount added.`);
+          toast.success(`Coupon applied! ${(discountRate * 100).toFixed(0)}% discount added for applicable items.`);
         }
       }
     } catch (error) {
@@ -111,7 +133,7 @@ const CheckoutPage = () => {
         discountAmount: appliedCoupon?.discount || 0,
         couponUsed: appliedCoupon?.code || null,
         referralUserId: appliedCoupon?.userId || null,
-        commissionAmount: appliedCoupon ? (subtotal * appliedCoupon.commissionRate) : 0,
+        commissionAmount: appliedCoupon ? (appliedCoupon.applicableSubtotal * appliedCoupon.commissionRate) : 0,
         status: 'pending',
         paymentStatus: 'pending',
         paymentMethod: 'whatsapp',
@@ -184,7 +206,7 @@ const CheckoutPage = () => {
         discountAmount: appliedCoupon?.discount || 0,
         couponUsed: appliedCoupon?.code || null,
         referralUserId: appliedCoupon?.userId || null,
-        commissionAmount: appliedCoupon ? (subtotal * appliedCoupon.commissionRate) : 0,
+        commissionAmount: appliedCoupon ? (appliedCoupon.applicableSubtotal * appliedCoupon.commissionRate) : 0,
         status: 'pending',
         paymentStatus: 'completed',
         paymentId: 'wallet_pay_' + Math.random().toString(36).substr(2, 9),
@@ -205,7 +227,7 @@ const CheckoutPage = () => {
       await logAction(user.uid, user.email || '', user.displayName || '', 'PLACE_ORDER', `Placed order #${orderRef.id.slice(-6)} for ₹${totalAmount} (Wallet Payment)`, 'user');
       
       if (appliedCoupon) {
-        const commissionAmount = subtotal * appliedCoupon.commissionRate;
+        const commissionAmount = appliedCoupon.applicableSubtotal * appliedCoupon.commissionRate;
         await addDoc(collection(db, 'referrals'), {
           couponOwnerId: appliedCoupon.userId,
           orderId: orderRef.id,
