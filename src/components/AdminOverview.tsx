@@ -19,23 +19,38 @@ import {
 
 const AdminOverview = () => {
   const { profile: adminProfile } = useAuth();
+  const [viewMode, setViewMode] = useState<'today' | 'all'>('today');
   const [stats, setStats] = useState({
     totalSales: 0,
+    todaySales: 0,
     totalOrders: 0,
+    todayOrders: 0,
     totalUsers: 0,
+    todayUsers: 0,
     totalCommission: 0,
+    todayCommission: 0,
     totalProducts: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [salesData, setSalesData] = useState<any[]>([]);
 
   useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
     const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), (snapshot) => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setRecentOrders(orders.slice(0, 5));
       
       const totalSales = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-      setStats(prev => ({ ...prev, totalOrders: orders.length, totalSales }));
+      const todaySales = orders.filter(o => o.createdAt.startsWith(today)).reduce((sum, o) => sum + o.totalAmount, 0);
+      const todayOrders = orders.filter(o => o.createdAt.startsWith(today)).length;
+      
+      setStats(prev => ({ 
+        ...prev, 
+        totalOrders: orders.length, 
+        todayOrders,
+        totalSales,
+        todaySales
+      }));
 
       const last7Days = [...Array(7)].map((_, i) => {
         const d = new Date();
@@ -57,7 +72,10 @@ const AdminOverview = () => {
     });
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setStats(prev => ({ ...prev, totalUsers: snapshot.size }));
+      const users = snapshot.docs.map(doc => doc.data() as UserProfile);
+      const today = new Date().toISOString().split('T')[0];
+      const todayUsers = users.filter(u => u.createdAt?.startsWith(today)).length;
+      setStats(prev => ({ ...prev, totalUsers: users.length, todayUsers }));
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'users');
     });
@@ -70,10 +88,14 @@ const AdminOverview = () => {
 
     const unsubReferrals = onSnapshot(collection(db, 'referrals'), (snapshot) => {
       const refs = snapshot.docs.map(doc => doc.data() as Referral);
+      const today = new Date().toISOString().split('T')[0];
       const earnedCommission = refs
         .filter(r => r.status === 'earned')
         .reduce((sum, r) => sum + r.amount, 0);
-      setStats(prev => ({ ...prev, totalCommission: earnedCommission }));
+      const todayCommission = refs
+        .filter(r => r.status === 'earned' && r.createdAt.startsWith(today))
+        .reduce((sum, r) => sum + r.amount, 0);
+      setStats(prev => ({ ...prev, totalCommission: earnedCommission, todayCommission }));
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'referrals');
     });
@@ -88,19 +110,60 @@ const AdminOverview = () => {
 
   return (
     <div className="space-y-12 pb-12">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Admin <span className="text-orange-600">Overview</span></h1>
           <p className="text-gray-500 mt-2">Business performance at a glance.</p>
         </div>
+        
+        <div className="bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-1">
+          <button 
+            onClick={() => setViewMode('today')}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              viewMode === 'today' ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" : "text-gray-400 hover:text-gray-900"
+            )}
+          >
+            Today
+          </button>
+          <button 
+            onClick={() => setViewMode('all')}
+            className={cn(
+              "px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+              viewMode === 'all' ? "bg-orange-600 text-white shadow-lg shadow-orange-600/20" : "text-gray-400 hover:text-gray-900"
+            )}
+          >
+            All Time
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Total Sales', value: `₹${stats.totalSales.toLocaleString()}`, icon: ShoppingBag, color: 'orange' },
-          { label: 'Total Orders', value: stats.totalOrders, icon: Package, color: 'blue' },
-          { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'purple' },
-          { label: 'Commission Paid', value: `₹${stats.totalCommission.toLocaleString()}`, icon: Ticket, color: 'green' },
+          { 
+            label: viewMode === 'today' ? "Today's Sales" : 'Total Sales', 
+            value: `₹${(viewMode === 'today' ? stats.todaySales : stats.totalSales).toLocaleString()}`, 
+            icon: ShoppingBag, 
+            color: 'orange' 
+          },
+          { 
+            label: viewMode === 'today' ? "Today's Orders" : 'Total Orders', 
+            value: viewMode === 'today' ? stats.todayOrders : stats.totalOrders, 
+            icon: Package, 
+            color: 'blue' 
+          },
+          { 
+            label: viewMode === 'today' ? "Today's Users" : 'Total Users', 
+            value: viewMode === 'today' ? stats.todayUsers : stats.totalUsers, 
+            icon: Users, 
+            color: 'purple' 
+          },
+          { 
+            label: viewMode === 'today' ? 'Today\'s Commission' : 'Commission Paid', 
+            value: `₹${(viewMode === 'today' ? stats.todayCommission : stats.totalCommission).toLocaleString()}`, 
+            icon: Ticket, 
+            color: 'green' 
+          },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <div className={cn(

@@ -309,6 +309,13 @@ service cloud.firestore {
       allow update: if isAdmin() && isValidWithdrawal(request.resource.data);
     }
 
+    match /coupons/{couponId} {
+      // Admins can manage coupons.
+      // Users can read coupons to validate them (limited by query/doc lookup in app)
+      allow read, list: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     match /settings/{settingId} {
       // Anyone can read global settings.
       allow read, list: if true;

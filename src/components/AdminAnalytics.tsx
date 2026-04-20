@@ -9,8 +9,8 @@ import { Calendar, TrendingUp, Users as UsersIcon, ShoppingBag, IndianRupee } fr
 
 export const AdminReferrals = () => {
   const [referrals, setReferrals] = useState<Referral[]>([]);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'referrals'), orderBy('createdAt', 'desc')), (snapshot) => {
@@ -120,9 +120,9 @@ export const AdminAnalytics = () => {
   const [trainerSessions, setTrainerSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Date range state
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  // Date range state - Default to today
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     let ordersLoaded = false;
@@ -415,8 +415,8 @@ export const AdminAnalytics = () => {
 export const AdminAuditLogs = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc')), (snapshot) => {
