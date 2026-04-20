@@ -59,13 +59,14 @@ const AdminOrders = () => {
                 maturesAt: maturesAt
               });
               await updateDoc(userRef, {
-                'wallet.pending': increment(-refData.amount),
+                'wallet.pending': increment(refData.amount),
+                'wallet.totalEarned': increment(refData.amount),
               });
-              toast.success('Commission earned! It will be withdrawable in 12 hours.');
+              toast.success('Commission added to wallet! It will be withdrawable in 12 hours.');
             }
           }
           
-          // If moved OUT of delivered: move back to pending
+          // If moved OUT of delivered: move back to pending and reverse wallet
           else if (status !== 'delivered' && oldStatus === 'delivered') {
             if (refData.status === 'earned') {
               await updateDoc(doc(db, 'referrals', refDoc.id), { 
@@ -73,9 +74,10 @@ const AdminOrders = () => {
                 maturesAt: null
               });
               await updateDoc(userRef, {
-                'wallet.pending': increment(refData.amount),
+                'wallet.pending': increment(-refData.amount),
+                'wallet.totalEarned': increment(-refData.amount),
               });
-              toast.info('Commission moved back to pending');
+              toast.info('Commission reversed (order status changed from delivered)');
             }
           }
 
@@ -83,14 +85,12 @@ const AdminOrders = () => {
           else if (status === 'cancelled' && oldStatus !== 'cancelled') {
             if (refData.status === 'pending') {
               await updateDoc(doc(db, 'referrals', refDoc.id), { status: 'cancelled' });
-              await updateDoc(userRef, {
-                'wallet.pending': increment(-refData.amount),
-                'wallet.totalEarned': increment(-refData.amount),
-              });
+              // No wallet changes needed as it wasn't added to wallet yet
               toast.info('Pending commission cancelled');
             } else if (refData.status === 'earned') {
               await updateDoc(doc(db, 'referrals', refDoc.id), { status: 'cancelled' });
               await updateDoc(userRef, {
+                'wallet.pending': increment(-refData.amount),
                 'wallet.totalEarned': increment(-refData.amount),
               });
               toast.info('Maturing commission cancelled');

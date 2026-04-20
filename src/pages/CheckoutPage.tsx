@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { ChevronRight, ShieldCheck, CreditCard, Truck, CheckCircle2, AlertCircle, ShoppingBag, ArrowRight, Wallet, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { Order, UserProfile } from '../types';
+import { Order, UserProfile, Coupon } from '../types';
 import { DEFAULT_DISCOUNT_RATE, DEFAULT_COMMISSION_RATE, WHATSAPP_NUMBER } from '../constants';
 
 const DELIVERY_CHARGE = 0;
@@ -67,51 +67,83 @@ const CheckoutPage = () => {
     if (!couponCode) return;
     setLoading(true);
     try {
-      const q = query(collection(db, 'users'), where('couponCode', '==', couponCode.toUpperCase()));
+      const couponCodeUpper = couponCode.toUpperCase();
+      
+      // 1. Check if it's a primary coupon code in UserProfile
+      const q = query(collection(db, 'users'), where('couponCode', '==', couponCodeUpper));
       const querySnapshot = await getDocs(q);
       
-      if (querySnapshot.empty) {
-        toast.error('Invalid coupon code');
-        setAppliedCoupon(null);
-      } else {
+      let ownerUid: string | null = null;
+      let commissionRate = globalSettings?.defaultCommissionRate || DEFAULT_COMMISSION_RATE;
+      let discountRate = globalSettings?.defaultDiscountRate || DEFAULT_DISCOUNT_RATE;
+      let allowedCategories: string[] = [];
+
+      if (!querySnapshot.empty) {
         const couponOwner = querySnapshot.docs[0].data() as UserProfile;
         if (couponOwner.isCouponDisabled) {
           toast.error('This coupon code is currently disabled');
           setAppliedCoupon(null);
-        } else if (couponOwner.uid === user?.uid) {
+          return;
+        }
+        if (couponOwner.uid === user?.uid) {
           toast.error('You cannot use your own coupon code');
           setAppliedCoupon(null);
-        } else {
-          const commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || DEFAULT_COMMISSION_RATE;
-          const discountRate = couponOwner.customDiscountRate || globalSettings?.defaultDiscountRate || DEFAULT_DISCOUNT_RATE;
-          const allowedCategories = couponOwner.allowedCouponCategories || [];
-          
-          let applicableSubtotal = 0;
-          items.forEach(item => {
-            if (allowedCategories.length === 0 || allowedCategories.includes(item.category)) {
-              applicableSubtotal += item.price * item.quantity;
-            }
-          });
-
-          if (applicableSubtotal === 0) {
-            toast.error(`This coupon is only valid for categories: ${allowedCategories.join(', ')}`);
+          return;
+        }
+        ownerUid = couponOwner.uid;
+        commissionRate = couponOwner.customCommissionRate || globalSettings?.defaultCommissionRate || DEFAULT_COMMISSION_RATE;
+        discountRate = couponOwner.customDiscountRate || globalSettings?.defaultDiscountRate || DEFAULT_DISCOUNT_RATE;
+        allowedCategories = couponOwner.allowedCouponCategories || [];
+      } else {
+        // 2. Check if it's an additional coupon in coupons collection
+        const couponDoc = await getDoc(doc(db, 'coupons', couponCodeUpper));
+        if (couponDoc.exists()) {
+          const couponData = couponDoc.data() as Coupon;
+          if (!couponData.isActive) {
+            toast.error('This coupon code is inactive');
             setAppliedCoupon(null);
             return;
           }
-
-          const discount = applicableSubtotal * discountRate;
-          setAppliedCoupon({
-            code: couponCode.toUpperCase(),
-            userId: couponOwner.uid,
-            discount,
-            commissionRate,
-            applicableSubtotal
-          });
-          toast.success(`Coupon applied! ${(discountRate * 100).toFixed(0)}% discount added for applicable items.`);
+          if (couponData.ownerId === user?.uid) {
+            toast.error('You cannot use your own coupon code');
+            setAppliedCoupon(null);
+            return;
+          }
+          ownerUid = couponData.ownerId;
+          commissionRate = couponData.commissionRate;
+          discountRate = couponData.discountRate;
+          allowedCategories = couponData.allowedCategories || [];
+        } else {
+          toast.error('Invalid coupon code');
+          setAppliedCoupon(null);
+          return;
         }
       }
+
+      let applicableSubtotal = 0;
+      items.forEach(item => {
+        if (allowedCategories.length === 0 || allowedCategories.includes(item.category)) {
+          applicableSubtotal += item.price * item.quantity;
+        }
+      });
+
+      if (applicableSubtotal === 0) {
+        toast.error(`This coupon is only valid for categories: ${allowedCategories.join(', ')}`);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      const discount = applicableSubtotal * discountRate;
+      setAppliedCoupon({
+        code: couponCodeUpper,
+        userId: ownerUid,
+        discount,
+        commissionRate,
+        applicableSubtotal
+      });
+      toast.success(`Coupon applied! ${(discountRate * 100).toFixed(0)}% discount added for applicable items.`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'users');
+      handleFirestoreError(error, OperationType.GET, 'users/coupons');
     } finally {
       setLoading(false);
     }
@@ -144,6 +176,20 @@ const CheckoutPage = () => {
       };
       
       await setDoc(doc(db, 'orders', orderId), orderData);
+
+      if (appliedCoupon) {
+        const commissionAmount = appliedCoupon.applicableSubtotal * appliedCoupon.commissionRate;
+        await addDoc(collection(db, 'referrals'), {
+          couponOwnerId: appliedCoupon.userId,
+          orderId: orderId,
+          amount: commissionAmount,
+          orderTotal: totalAmount,
+          customerName: address.fullName,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
+      }
+
       await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for order #${orderId.slice(-6)} for ₹${totalAmount}`, 'user');
 
       // 2. Generate WhatsApp message
@@ -239,10 +285,7 @@ const CheckoutPage = () => {
         });
 
         const referralUserRef = doc(db, 'users', appliedCoupon.userId);
-        await updateDoc(referralUserRef, {
-          'wallet.pending': increment(commissionAmount),
-          'wallet.totalEarned': increment(commissionAmount),
-        });
+        // We no longer increment wallet here. Admin will do it upon delivery.
       }
 
       setPaymentStep('success');

@@ -25,6 +25,16 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export interface Coupon {
+  id: string; // The code itself (unique)
+  ownerId: string;
+  discountRate: number;
+  commissionRate: number;
+  allowedCategories: string[];
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Product {
   id: string;
   name: string;

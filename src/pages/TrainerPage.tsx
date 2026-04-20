@@ -21,7 +21,7 @@ import {
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, orderBy, limit, getDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { useAuth } from '../AuthContext';
-import { TrainerSession, TrainerMessage, TrainerProfile, UserProfile } from '../types';
+import { TrainerSession, TrainerMessage, TrainerProfile, UserProfile, Coupon } from '../types';
 import { TRAINER_PRICE, TRAINER_DISCOUNTED_PRICE, WHATSAPP_NUMBER, TRAINER_CHAT_DURATION, ADMIN_REPLY_TIMEOUT } from '../constants';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -138,39 +138,70 @@ const TrainerPage = () => {
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
     try {
-      const q = query(collection(db, 'users'), where('couponCode', '==', couponCode.toUpperCase()));
+      const couponCodeUpper = couponCode.toUpperCase();
+      
+      // 1. Check if it's a primary coupon code in UserProfile
+      const q = query(collection(db, 'users'), where('couponCode', '==', couponCodeUpper));
       const querySnapshot = await getDocs(q);
       
-      if (querySnapshot.empty) {
-        toast.error('Invalid coupon code');
-        setReferralUserId(null);
-        setIsCouponValid(false);
-      } else {
+      let ownerUid: string | null = null;
+      let allowedCategories: string[] = [];
+
+      if (!querySnapshot.empty) {
         const couponOwner = querySnapshot.docs[0].data() as UserProfile;
         if (couponOwner.isCouponDisabled) {
           toast.error('This coupon code is currently disabled');
           setReferralUserId(null);
           setIsCouponValid(false);
-        } else if (couponOwner.uid === user?.uid) {
+          return;
+        }
+        if (couponOwner.uid === user?.uid) {
           toast.error('You cannot use your own coupon code');
           setReferralUserId(null);
           setIsCouponValid(false);
-        } else {
-          const allowedCategories = couponOwner.allowedCouponCategories || [];
-          if (allowedCategories.length > 0 && !allowedCategories.includes('Trainer Program')) {
-            toast.error('This coupon is not valid for the Trainer Program');
+          return;
+        }
+        ownerUid = couponOwner.uid;
+        allowedCategories = couponOwner.allowedCouponCategories || [];
+      } else {
+        // 2. Check if it's an additional coupon in coupons collection
+        const couponDoc = await getDoc(doc(db, 'coupons', couponCodeUpper));
+        if (couponDoc.exists()) {
+          const couponData = couponDoc.data() as Coupon;
+          if (!couponData.isActive) {
+            toast.error('This coupon code is inactive');
             setReferralUserId(null);
             setIsCouponValid(false);
             return;
           }
-          
-          setReferralUserId(couponOwner.uid);
-          setIsCouponValid(true);
-          toast.success(`Coupon applied! Price reduced to ₹${TRAINER_DISCOUNTED_PRICE}.`);
+          if (couponData.ownerId === user?.uid) {
+            toast.error('You cannot use your own coupon code');
+            setReferralUserId(null);
+            setIsCouponValid(false);
+            return;
+          }
+          ownerUid = couponData.ownerId;
+          allowedCategories = couponData.allowedCategories || [];
+        } else {
+          toast.error('Invalid coupon code');
+          setReferralUserId(null);
+          setIsCouponValid(false);
+          return;
         }
       }
+
+      if (allowedCategories.length > 0 && !allowedCategories.includes('Trainer Program')) {
+        toast.error('This coupon is not valid for the Trainer Program');
+        setReferralUserId(null);
+        setIsCouponValid(false);
+        return;
+      }
+      
+      setReferralUserId(ownerUid);
+      setIsCouponValid(true);
+      toast.success(`Coupon applied! Price reduced to ₹${TRAINER_DISCOUNTED_PRICE}.`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'users');
+      handleFirestoreError(error, OperationType.GET, 'users/coupons');
     }
   };
 

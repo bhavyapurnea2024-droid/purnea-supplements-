@@ -14,8 +14,8 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { TrainerSession, TrainerProfile, UserProfile, TrainerMessage } from '../types';
-import { TRAINER_CHAT_DURATION, TRAINER_REFERRAL_COMMISSION, TRAINER_PRICE, TRAINER_DISCOUNTED_PRICE } from '../constants';
+import { TrainerSession, TrainerProfile, UserProfile, TrainerMessage, Coupon } from '../types';
+import { TRAINER_CHAT_DURATION, TRAINER_REFERRAL_COMMISSION, TRAINER_PRICE, TRAINER_DISCOUNTED_PRICE, DEFAULT_COMMISSION_RATE } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
@@ -85,10 +85,47 @@ const AdminTrainerManager = () => {
 
       // Handle referral commission if applicable
       if (session.referralUserId) {
+        let commissionAmount = TRAINER_REFERRAL_COMMISSION;
+        
+        if (session.couponUsed) {
+          const couponCode = session.couponUsed.toUpperCase();
+          // Try to find if it was an additional coupon
+          const couponDoc = await getDoc(doc(db, 'coupons', couponCode));
+          if (couponDoc.exists()) {
+            const couponData = couponDoc.data() as Coupon;
+            commissionAmount = TRAINER_DISCOUNTED_PRICE * couponData.commissionRate;
+          } else {
+            // Check primary coupon
+            const q = query(collection(db, 'users'), where('couponCode', '==', couponCode));
+            const userSnap = await getDocs(q);
+            if (!userSnap.empty) {
+              const owner = userSnap.docs[0].data() as UserProfile;
+              // Only override if custom commission rate is set, otherwise use standard trainer commission
+              if (owner.customCommissionRate !== undefined) {
+                commissionAmount = TRAINER_DISCOUNTED_PRICE * owner.customCommissionRate;
+              }
+            }
+          }
+        }
+
         const referrerDoc = doc(db, 'users', session.referralUserId);
+        const maturesAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+
+        // Create referral record to track the commission and allow maturity/claiming
+        await addDoc(collection(db, 'referrals'), {
+          couponOwnerId: session.referralUserId,
+          orderId: session.id,
+          amount: commissionAmount,
+          orderTotal: session.couponUsed ? TRAINER_DISCOUNTED_PRICE : TRAINER_PRICE,
+          customerName: session.userName,
+          status: 'earned',
+          maturesAt,
+          createdAt: new Date().toISOString(),
+        });
+
         await updateDoc(referrerDoc, {
-          'wallet.pending': increment(TRAINER_REFERRAL_COMMISSION),
-          'wallet.totalEarned': increment(TRAINER_REFERRAL_COMMISSION)
+          'wallet.pending': increment(commissionAmount),
+          'wallet.totalEarned': increment(commissionAmount)
         });
         
         await logAction(
@@ -96,7 +133,7 @@ const AdminTrainerManager = () => {
           'system@purneasupps.com',
           'System',
           'TRAINER_REFERRAL_COMMISSION',
-          `₹${TRAINER_REFERRAL_COMMISSION} credited to ${session.referralUserId} for trainer purchase by ${session.userId}`,
+          `₹${commissionAmount.toFixed(2)} credited to ${session.referralUserId} for trainer purchase by ${session.userId}`,
           'admin'
         );
       }

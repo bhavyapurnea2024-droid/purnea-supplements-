@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, updateDoc, where, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, where, orderBy, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { UserProfile, Order, TrainerSession } from '../types';
+import { UserProfile, Order, TrainerSession, Coupon } from '../types';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { X, TrendingUp, RefreshCw, Shield, User as UserIcon, Dumbbell } from 'lucide-react';
+import { X, TrendingUp, RefreshCw, Shield, User as UserIcon, Dumbbell, Plus, Trash2, Percent, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { DEFAULT_COMMISSION_RATE, DEFAULT_DISCOUNT_RATE, CATEGORIES } from '../constants';
 
 const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [additionalCoupons, setAdditionalCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [manualCoupon, setManualCoupon] = useState(user.couponCode || '');
@@ -31,6 +32,54 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
     });
     return () => unsub();
   }, [user.couponCode]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'coupons'), where('ownerId', '==', user.uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setAdditionalCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon)));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `coupons-for-user-${user.uid}`);
+    });
+    return () => unsub();
+  }, [user.uid]);
+
+  const addCoupon = async () => {
+    const code = (user.displayName?.split(' ')[0]?.toUpperCase() || 'USER') + Math.floor(1000 + Math.random() * 9000);
+    const newCoupon: Coupon = {
+      id: code,
+      ownerId: user.uid,
+      discountRate: DEFAULT_DISCOUNT_RATE,
+      commissionRate: DEFAULT_COMMISSION_RATE,
+      allowedCategories: [],
+      isActive: true,
+      createdAt: new Date().toISOString()
+    };
+    try {
+      await setDoc(doc(db, 'coupons', code), newCoupon);
+      toast.success(`Coupon ${code} added`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `coupons/${code}`);
+    }
+  };
+
+  const updateCoupon = async (code: string, updates: any) => {
+    try {
+      await updateDoc(doc(db, 'coupons', code), updates);
+      toast.success(`Coupon ${code} updated`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `coupons/${code}`);
+    }
+  };
+
+  const deleteCoupon = async (code: string) => {
+    if (!window.confirm(`Delete coupon ${code}?`)) return;
+    try {
+      await deleteDoc(doc(db, 'coupons', code));
+      toast.success(`Coupon ${code} deleted`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `coupons/${code}`);
+    }
+  };
 
   const toggleCouponStatus = async () => {
     const currentStatus = user.isCouponDisabled || false;
@@ -328,6 +377,110 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Additional Coupons */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-black text-gray-400 uppercase tracking-widest">Additional Coupons</h5>
+              <button 
+                onClick={addCoupon}
+                className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-800 transition-all shadow-lg"
+              >
+                <Plus className="w-4 h-4" /> Add New Coupon
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {additionalCoupons.map((coupon) => (
+                <div key={coupon.id} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6 relative group">
+                  <button 
+                    onClick={() => deleteCoupon(coupon.id)}
+                    className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                      <Tag className="w-4 h-4" />
+                    </div>
+                    <h6 className="text-lg font-black text-gray-900 tracking-widest uppercase">{coupon.id}</h6>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Discount (%)</label>
+                      <div className="flex items-center gap-2">
+                        <Percent className="w-3 h-3 text-gray-400" />
+                        <input 
+                          type="number" 
+                          value={Math.round(coupon.discountRate * 100)}
+                          onChange={(e) => updateCoupon(coupon.id, { discountRate: Number(e.target.value) / 100 })}
+                          className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm font-black focus:ring-2 ring-orange-500/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Commission (%)</label>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-3 h-3 text-gray-400" />
+                        <input 
+                          type="number" 
+                          value={Math.round(coupon.commissionRate * 100)}
+                          onChange={(e) => updateCoupon(coupon.id, { commissionRate: Number(e.target.value) / 100 })}
+                          className="w-full bg-gray-50 border-none rounded-lg px-3 py-2 text-sm font-black focus:ring-2 ring-orange-500/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Allowed Categories</label>
+                    <div className="flex flex-wrap gap-1">
+                      {CATEGORIES.map(cat => {
+                        const isActive = coupon.allowedCategories.includes(cat);
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => {
+                              const next = isActive 
+                                ? coupon.allowedCategories.filter(item => item !== cat)
+                                : [...coupon.allowedCategories, cat];
+                              updateCoupon(coupon.id, { allowedCategories: next });
+                            }}
+                            className={cn(
+                              "px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest border transition-all",
+                              isActive ? "bg-orange-600 border-orange-600 text-white" : "bg-white border-gray-100 text-gray-400"
+                            )}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Status</span>
+                    <button 
+                      onClick={() => updateCoupon(coupon.id, { isActive: !coupon.isActive })}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
+                        coupon.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      )}
+                    >
+                      {coupon.isActive ? 'Active' : 'Inactive'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {additionalCoupons.length === 0 && (
+                <div className="md:col-span-2 p-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-100">
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">No additional coupons for this user</p>
+                </div>
+              )}
             </div>
           </div>
 
