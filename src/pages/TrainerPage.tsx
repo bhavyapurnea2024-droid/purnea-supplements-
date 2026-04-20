@@ -158,7 +158,7 @@ const TrainerPage = () => {
         } else {
           setReferralUserId(couponOwner.uid);
           setIsCouponValid(true);
-          toast.success('Coupon applied! Price reduced to ₹500.');
+          toast.success(`Coupon applied! Price reduced to ₹${TRAINER_DISCOUNTED_PRICE}.`);
         }
       }
     } catch (error) {
@@ -220,7 +220,7 @@ const TrainerPage = () => {
         messages: [
           {
             role: 'admin',
-            text: 'Trainer will review your details. You will receive your workout plan and diet plan within 2 hours.',
+            text: 'Trainer will review your details. You will receive your workout plan and diet plan within 1 hour.',
             timestamp: new Date().toISOString()
           }
         ]
@@ -312,11 +312,11 @@ const TrainerPage = () => {
                     <p className="text-gray-400 text-xs font-black uppercase tracking-widest mb-1">Limited Time Offer</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-4xl font-black text-white tracking-tighter">₹{isCouponValid ? TRAINER_DISCOUNTED_PRICE : TRAINER_PRICE}</span>
-                      {!isCouponValid && <span className="text-lg text-gray-500 line-through font-bold">₹599</span>}
+                      {!isCouponValid && <span className="text-lg text-gray-500 line-through font-bold">₹549</span>}
                     </div>
                   </div>
                   <div className="bg-orange-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                    {isCouponValid ? 'Coupon Applied' : `Save ₹${599 - TRAINER_PRICE}`}
+                    {isCouponValid ? 'Coupon Applied' : `Save ₹${549 - TRAINER_PRICE}`}
                   </div>
                 </div>
 
@@ -363,7 +363,7 @@ const TrainerPage = () => {
               { icon: Dumbbell, title: "Custom Workout", desc: "Tailored exercises based on your equipment and schedule." },
               { icon: Utensils, title: "Custom Diet", desc: "Indian diet plans that fit your taste and lifestyle." },
               { icon: MessageSquare, title: "1-on-1 Chat", desc: "Direct access to your trainer for any questions." },
-              { icon: Zap, title: "Fast Response", desc: "Get your plans within 2 hours of submission." }
+              { icon: Zap, title: "Fast Response", desc: "Get your plans within 1 hour of submission." }
             ].map((feature, i) => (
               <motion.div
                 key={i}
@@ -620,8 +620,8 @@ const TrainerPage = () => {
             <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl flex items-start gap-3 max-w-md mx-auto">
               <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-orange-900">Trainer is currently unavailable.</p>
-                <p className="text-[10px] text-orange-700 mt-1">Please contact on WhatsApp: <a href={`https://wa.me/${WHATSAPP_NUMBER}`} className="underline font-black">{WHATSAPP_NUMBER}</a></p>
+                <p className="text-xs font-bold text-orange-900">Our Trainer hasn't replied in over an hour.</p>
+                <p className="text-[10px] text-orange-700 mt-1">Please message us directly on WhatsApp: <a href={`https://wa.me/917488804611`} className="underline font-black">7488804611</a></p>
               </div>
             </div>
           )}

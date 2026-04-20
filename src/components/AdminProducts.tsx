@@ -25,7 +25,7 @@ const AdminProducts = () => {
     brand: '',
     goal: GOALS[0].id,
     stock: 0,
-    images: [''],
+    images: ['', '', '', ''],
     flavors: '',
     weights: '',
     commissionRate: 0.05,
@@ -49,8 +49,16 @@ const AdminProducts = () => {
 
     setLoading(true);
     try {
+      const filteredImages = formData.images.map(img => img.trim()).filter(img => img !== '');
+      if (filteredImages.length === 0) {
+        toast.error('Please provide at least one product image');
+        setLoading(false);
+        return;
+      }
+
       const productData = {
         ...formData,
+        images: filteredImages,
         flavors: formData.flavors ? formData.flavors.split(',').map(f => f.trim()).filter(f => f) : [],
         weights: formData.weights ? formData.weights.split(',').map(w => w.trim()).filter(w => w) : [],
         rating: editingProduct?.rating || 5,
@@ -78,7 +86,7 @@ const AdminProducts = () => {
         brand: '', 
         goal: GOALS[0].id, 
         stock: 0, 
-        images: [''], 
+        images: ['', '', '', ''], 
         flavors: '',
         weights: '',
         commissionRate: DEFAULT_COMMISSION_RATE, 
@@ -121,7 +129,7 @@ const AdminProducts = () => {
               brand: '', 
               goal: GOALS[0].id, 
               stock: 0, 
-              images: [''], 
+              images: ['', '', '', ''], 
               flavors: '',
               weights: '',
               commissionRate: 0.05, 
@@ -186,7 +194,7 @@ const AdminProducts = () => {
                             brand: product.brand,
                             goal: product.goal,
                             stock: product.stock,
-                            images: product.images,
+                            images: Array(4).fill('').map((_, i) => product.images[i] || ''),
                             flavors: (product.flavors || []).join(', '),
                             weights: (product.weights || []).join(', '),
                             commissionRate: product.commissionRate || 0.05,
@@ -351,15 +359,28 @@ const AdminProducts = () => {
                         placeholder="e.g. BUY 1 GET 1 FREE"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Image URL</label>
-                      <input 
-                        type="text" 
-                        value={formData.images[0]}
-                        onChange={(e) => setFormData({...formData, images: [e.target.value]})}
-                        className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20"
-                        placeholder="https://..."
-                      />
+                    <div className="space-y-4">
+                      <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-1">Product Images (Up to 4)</label>
+                      {[0, 1, 2, 3].map((index) => (
+                        <div key={index} className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={formData.images[index]}
+                            onChange={(e) => {
+                              const newImages = [...formData.images];
+                              newImages[index] = e.target.value;
+                              setFormData({...formData, images: newImages});
+                            }}
+                            className="flex-grow bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20 text-sm"
+                            placeholder={`Image URL ${index + 1}`}
+                          />
+                          {formData.images[index] && (
+                            <div className="w-11 h-11 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+                              <img src={formData.images[index]} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                     <div>
                       <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Flavors (Comma separated)</label>

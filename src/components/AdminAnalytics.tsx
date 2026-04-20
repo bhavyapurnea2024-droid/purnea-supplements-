@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Order, UserProfile, Referral, AuditLog } from '../types';
+import { TRAINER_PRICE, TRAINER_DISCOUNTED_PRICE } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { cn } from '../lib/utils';
 import { Calendar, TrendingUp, Users as UsersIcon, ShoppingBag, IndianRupee } from 'lucide-react';
@@ -219,7 +220,7 @@ export const AdminAnalytics = () => {
 
   // Summary Metrics
   const productRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-  const trainerRevenue = filteredTrainer.reduce((sum, s) => sum + (s.couponUsed ? 500 : 549), 0);
+  const trainerRevenue = filteredTrainer.reduce((sum, s) => sum + (s.couponUsed ? TRAINER_DISCOUNTED_PRICE : TRAINER_PRICE), 0);
   const totalRevenue = productRevenue + trainerRevenue;
   
   const totalOrders = filteredOrders.length + filteredTrainer.length;
@@ -232,7 +233,7 @@ export const AdminAnalytics = () => {
   // Process daily revenue for line chart
   const dailyRevenue = [...filteredOrders, ...filteredTrainer].reduce((acc: any, item) => {
     const date = new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    const amount = 'totalAmount' in item ? item.totalAmount : (item.couponUsed ? 500 : 549);
+    const amount = 'totalAmount' in item ? item.totalAmount : (item.couponUsed ? TRAINER_DISCOUNTED_PRICE : TRAINER_PRICE);
     acc[date] = (acc[date] || 0) + amount;
     return acc;
   }, {});
@@ -248,7 +249,7 @@ export const AdminAnalytics = () => {
   // Process data for charts
   const revenueByMonth = [...filteredOrders, ...filteredTrainer].reduce((acc: any, item) => {
     const month = new Date(item.createdAt).toLocaleString('default', { month: 'short' });
-    const amount = 'totalAmount' in item ? item.totalAmount : (item.couponUsed ? 500 : 549);
+    const amount = 'totalAmount' in item ? item.totalAmount : (item.couponUsed ? TRAINER_DISCOUNTED_PRICE : TRAINER_PRICE);
     acc[month] = (acc[month] || 0) + amount;
     return acc;
   }, {});

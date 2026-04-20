@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Product } from '../types';
-import { Star, ShoppingCart, ShieldCheck, Zap, TrendingUp, ChevronRight, Minus, Plus, Heart, Share2, CheckCircle2 } from 'lucide-react';
+import { Star, ShoppingCart, ShieldCheck, Zap, TrendingUp, ChevronRight, ChevronLeft, Minus, Plus, Heart, Share2, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useCart } from '../CartContext';
 import { toast } from 'sonner';
@@ -121,18 +121,59 @@ const ProductDetailPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24">
           {/* Image Gallery */}
           <div className="space-y-6">
-            <motion.div 
-              layoutId={`product-image-${product.id}`}
-              className="aspect-square rounded-3xl overflow-hidden bg-white border border-gray-100 shadow-sm flex items-center justify-center"
-            >
-              <img 
-                src={images[activeImage]} 
-                alt={product.name} 
-                className="max-w-full max-h-full object-contain"
-                referrerPolicy="no-referrer"
-                loading="eager"
-              />
-            </motion.div>
+            <div className="relative group">
+              <motion.div 
+                layoutId={`product-image-${product.id}`}
+                className="aspect-square rounded-3xl overflow-hidden bg-white border border-gray-100 shadow-sm flex items-center justify-center relative"
+              >
+                <img 
+                  key={activeImage}
+                  src={images[activeImage]} 
+                  alt={product.name} 
+                  className="max-w-full max-h-full object-contain"
+                  referrerPolicy="no-referrer"
+                  loading="eager"
+                />
+
+                {/* Sliding Buttons */}
+                {images.length > 1 && (
+                  <>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveImage((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+                      }}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-2xl bg-white/80 backdrop-blur-md border border-gray-100 shadow-lg text-gray-900 opacity-0 group-hover:opacity-100 transition-all hover:bg-orange-600 hover:text-white"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveImage((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-2xl bg-white/80 backdrop-blur-md border border-gray-100 shadow-lg text-gray-900 opacity-0 group-hover:opacity-100 transition-all hover:bg-orange-600 hover:text-white"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                    
+                    {/* Dots Indicator */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                      {images.map((_, i) => (
+                        <div 
+                          key={i}
+                          className={cn(
+                            "w-2 h-2 rounded-full transition-all",
+                            activeImage === i ? "w-6 bg-orange-600" : "bg-gray-300"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            </div>
+
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
               {images.map((img, i) => (
                 <button 
