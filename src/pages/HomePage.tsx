@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight, Utensils, Dumbbell, MessageSquare } from 'lucide-react';
-import { CATEGORIES } from '../constants';
+import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight, Utensils, Dumbbell, MessageSquare, MessageCircle, HelpCircle } from 'lucide-react';
+import { CATEGORIES, WHATSAPP_NUMBER } from '../constants';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -244,6 +244,32 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+      {/* Product Request Section */}
+      <section className="py-24 bg-gray-50 border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="max-w-3xl mx-auto">
+            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-8 text-orange-600">
+              <HelpCircle className="w-10 h-10" />
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter uppercase mb-6 leading-none">
+              Can't find what <br /> you're <span className="text-orange-600">looking for?</span>
+            </h2>
+            <p className="text-gray-500 text-lg mb-10 leading-relaxed">
+              If there is any supplement or fitness gear you need that isn't listed on our site, we'll get it for you! Connect with us directly on WhatsApp and let us know your requirements.
+            </p>
+            <a 
+              href={`https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}?text=${encodeURIComponent("Namaste! I'm looking for a product that isn't listed on your site. Can you help me find it?")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 bg-[#25D366] text-white px-10 py-5 rounded-2xl font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl shadow-green-600/20 uppercase tracking-widest"
+            >
+              <MessageCircle className="w-6 h-6" />
+              Request on WhatsApp
+            </a>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 };
