@@ -74,7 +74,7 @@ const AdminCategoryImages = () => {
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${cat}/400/225`;
+                      (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${cat}/800/450`;
                     }}
                   />
                 ) : (

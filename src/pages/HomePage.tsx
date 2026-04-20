@@ -29,7 +29,7 @@ const HomePage = () => {
       <section className="relative h-[600px] flex items-center overflow-hidden bg-gray-950">
         <div className="absolute inset-0 z-0 opacity-40">
           <img 
-            src="https://picsum.photos/seed/fitness-hero/1920/1080?blur=4" 
+            src="https://picsum.photos/seed/fitness-hero/1920/1080" 
             alt="Hero Background" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -100,23 +100,39 @@ const HomePage = () => {
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {CATEGORIES.map((cat, i) => (
-              <Link 
-                key={i} 
-                to={`/shop?category=${cat}`}
-                className="group relative h-48 rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all"
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                viewport={{ once: true }}
               >
-                <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <img 
-                    src={categoryImages[cat] || `https://picsum.photos/seed/${cat}/300/300`} 
-                    alt={cat} 
-                    className="w-full h-full object-cover" 
-                    referrerPolicy="no-referrer" 
-                  />
-                </div>
-                <div className="absolute inset-0 p-6 flex flex-col justify-end">
-                  <h3 className="font-black text-gray-900 text-lg leading-tight group-hover:text-orange-600 transition-colors uppercase">{cat}</h3>
-                </div>
-              </Link>
+                <Link 
+                  to={`/shop?category=${cat}`}
+                  className="group relative h-48 rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-2xl transition-all flex flex-col"
+                >
+                  {/* Category Image - Now Clear (Opacity 100) */}
+                  <div className="absolute inset-0 h-full w-full">
+                    <img 
+                      src={categoryImages[cat] || `https://picsum.photos/seed/${cat}/800/800`} 
+                      alt={cat} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 blur-0" 
+                      referrerPolicy="no-referrer" 
+                    />
+                    {/* Dark gradient at bottom to help with text if needed, but we'll use a white background for the label */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </div>
+                  
+                  {/* Category Name with White Background */}
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="bg-white/95 backdrop-blur-sm py-2 px-3 rounded-xl shadow-xl transform translate-y-0 group-hover:-translate-y-1 transition-all text-center">
+                      <h3 className="font-black text-gray-900 text-[10px] sm:text-xs leading-tight group-hover:text-orange-600 transition-colors uppercase tracking-widest truncate">
+                        {cat}
+                      </h3>
+                    </div>
+                  </div>
+                </Link>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -188,11 +204,11 @@ const HomePage = () => {
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-gray-900 rounded-[3rem] overflow-hidden relative">
-            <div className="absolute inset-0 opacity-20">
+            <div className="absolute inset-0 opacity-40 group hover:opacity-50 transition-opacity">
               <img 
-                src="https://picsum.photos/seed/trainer-promo/1200/600" 
+                src="https://picsum.photos/seed/trainer-promo/1920/1080" 
                 alt="Trainer" 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover grayscale-[20%] group-hover:scale-105 transition-transform duration-700"
                 referrerPolicy="no-referrer"
               />
             </div>
