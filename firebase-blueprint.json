@@ -42,6 +42,8 @@
         "goal": { "type": "string", "enum": ["muscle-gain", "fat-loss", "general-health", "performance"] },
         "stock": { "type": "integer" },
         "images": { "type": "array", "items": { "type": "string" } },
+        "flavors": { "type": "array", "items": { "type": "string" } },
+        "weights": { "type": "array", "items": { "type": "string" } },
         "rating": { "type": "number" },
         "numReviews": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" }
@@ -125,33 +127,31 @@
     },
     "TrainerProfile": {
       "title": "Trainer Profile",
-      "description": "Stores the AI Trainer's profile information.",
+      "description": "Stores the manual Trainer's profile information.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "image": { "type": "string" },
         "bio": { "type": "string" },
+        "experience": { "type": "string" },
+        "photoURL": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "updatedAt"]
     },
     "TrainerSession": {
       "title": "Trainer Session",
-      "description": "Stores AI Trainer sessions and plans.",
+      "description": "Stores manual Trainer sessions and form responses.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "active", "completed", "expired"] },
-        "paymentStatus": { "type": "string", "enum": ["pending", "completed", "failed"] },
-        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending_payment", "active", "completed", "expired"] },
+        "paymentVerified": { "type": "boolean" },
+        "formSubmitted": { "type": "boolean" },
+        "formData": { "type": "object" },
         "messages": { "type": "array", "items": { "type": "object" } },
-        "dietPlan": { "type": "string" },
-        "workoutPlan": { "type": "string" },
-        "answers": { "type": "object" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "expiresAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "status", "paymentStatus", "amount", "messages", "createdAt", "expiresAt"]
+      "required": ["userId", "status", "paymentVerified", "formSubmitted", "messages", "createdAt"]
     }
   },
   "firestore": {
@@ -162,10 +162,7 @@
     "/withdrawals/{withdrawalId}": { "schema": "WithdrawalRequest", "description": "Withdrawal requests." },
     "/audit_logs/{logId}": { "schema": "AuditLog", "description": "System audit logs." },
     "/settings/global": { "schema": "GlobalSettings", "description": "Global platform settings." },
-    "/settings/trainer": {
-      "schema": "TrainerProfile",
-      "description": "The AI Trainer's profile settings."
-    },
-    "/trainer_sessions/{sessionId}": { "schema": "TrainerSession", "description": "AI Trainer sessions." }
+    "/settings/trainer": { "schema": "TrainerProfile", "description": "The manual Trainer's profile settings." },
+    "/trainer_sessions/{sessionId}": { "schema": "TrainerSession", "description": "Manual Trainer sessions." }
   }
 }

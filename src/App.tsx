@@ -18,8 +18,8 @@ import MyCampaignPage from './pages/MyCampaignPage';
 import AdminDashboard from './pages/AdminDashboard';
 import OrderHistoryPage from './pages/OrderHistoryPage';
 import LoginPage from './pages/LoginPage';
-import AITrainerPage from './pages/AITrainerPage';
 import PaymentStatusPage from './pages/PaymentStatusPage';
+import TrainerPage from './pages/TrainerPage';
 import { LoginModal } from './components/LoginModal';
 import SpecialSaleBanner from './components/SpecialSaleBanner';
 
@@ -43,8 +43,8 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Shop', path: '/shop' },
+    { name: 'Your Trainer', path: '/trainer' },
     { name: 'MyCampaign', path: '/my-campaign' },
-    { name: 'Your Trainer', path: '/ai-trainer' },
   ];
 
   return (
@@ -223,7 +223,7 @@ const Footer = () => (
           <h4 className="text-white font-bold mb-6">Quick Links</h4>
           <ul className="space-y-4 text-sm">
             <li><Link to="/shop" className="hover:text-orange-500 transition-colors">Shop All</Link></li>
-            <li><Link to="/ai-trainer" className="hover:text-orange-500 transition-colors font-bold text-orange-600">Your Trainer</Link></li>
+            <li><Link to="/trainer" className="hover:text-orange-500 transition-colors">Your Trainer</Link></li>
             <li><Link to="/my-campaign" className="hover:text-orange-500 transition-colors">MyCampaign</Link></li>
             <li><Link to="/orders" className="hover:text-orange-500 transition-colors">Order Tracking</Link></li>
             <li><Link to="/about" className="hover:text-orange-500 transition-colors">About Us</Link></li>
@@ -284,7 +284,7 @@ const AppContent = () => {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/my-campaign" element={<MyCampaignPage />} />
-          <Route path="/ai-trainer" element={<AITrainerPage />} />
+          <Route path="/trainer" element={<TrainerPage />} />
           <Route path="/admin/*" element={<AdminDashboard />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/payment-status" element={<PaymentStatusPage />} />

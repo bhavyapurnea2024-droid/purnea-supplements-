@@ -286,9 +286,27 @@ const AdminOrders = () => {
                   </div>
                   <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                     {selectedOrder.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 font-medium">{item.name} <span className="text-gray-400 font-bold">x{item.quantity}</span></span>
-                        <span className="text-gray-900 font-black">₹{item.price * item.quantity}</span>
+                      <div key={idx}>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600 font-medium">
+                            {item.name} <span className="text-gray-400 font-bold">x{item.quantity}</span>
+                          </span>
+                          <span className="text-gray-900 font-black">₹{item.price * item.quantity}</span>
+                        </div>
+                        {(item.flavor || item.weight) && (
+                          <div className="flex gap-2 mt-1 mb-2">
+                            {item.flavor && (
+                              <span className="text-[10px] bg-white border border-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold">
+                                F: {item.flavor}
+                              </span>
+                            )}
+                            {item.weight && (
+                              <span className="text-[10px] bg-white border border-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold">
+                                W: {item.weight}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                     <div className="pt-3 border-t border-gray-200 flex justify-between">

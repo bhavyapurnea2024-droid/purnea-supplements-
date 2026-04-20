@@ -11,7 +11,6 @@ This project is optimized for deployment on [Vercel](https://vercel.com).
    - Import your GitHub repository or upload the project files.
 3. **Configure Environment Variables**:
    In the Vercel project settings, add the following environment variables (you can find these values in your `firebase-applet-config.json`):
-   - `GEMINI_API_KEY`: Your Gemini API key.
    - `VITE_FIREBASE_API_KEY`: Your Firebase API key.
    - `VITE_FIREBASE_AUTH_DOMAIN`: Your Firebase Auth domain.
    - `VITE_FIREBASE_PROJECT_ID`: Your Firebase project ID.

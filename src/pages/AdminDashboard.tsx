@@ -13,7 +13,6 @@ import {
   TrendingUp, 
   History, 
   CreditCard,
-  MessageSquare,
   User as UserIcon,
   Sparkles,
   Image as ImageIcon
@@ -29,10 +28,9 @@ import AdminUsers from '../components/AdminUsers';
 import AdminWithdrawals from '../components/AdminWithdrawals';
 import { AdminReferrals, AdminAuditLogs, AdminAnalytics } from '../components/AdminAnalytics';
 import AdminSettings from '../components/AdminSettings';
-import AdminTrainerSessions from '../components/AdminTrainerSessions';
-import AdminTrainerProfile from '../components/AdminTrainerProfile';
 import AdminSpecialSale from '../components/AdminSpecialSale';
 import AdminCategoryImages from '../components/AdminCategoryImages';
+import AdminTrainerManager from '../components/AdminTrainerManager';
 
 const AdminDashboard = () => {
   const { user, profile, logout } = useAuth();
@@ -66,9 +64,8 @@ const AdminDashboard = () => {
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Withdrawals', path: '/admin/withdrawals', icon: CreditCard },
     { name: 'Referrals', path: '/admin/referrals', icon: TrendingUp },
-    { name: 'Your Trainer Sessions', path: '/admin/trainer-sessions', icon: MessageSquare },
-    { name: 'Your Trainer Profile', path: '/admin/trainer-profile', icon: UserIcon },
     { name: 'Analytics', path: '/admin/analytics', icon: TrendingUp },
+    { name: 'Trainer Manager', path: '/admin/trainer', icon: UserIcon },
     { name: 'Special Sale', path: '/admin/special-sale', icon: Sparkles },
     { name: 'Category Images', path: '/admin/category-images', icon: ImageIcon },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
@@ -174,10 +171,9 @@ const AdminDashboard = () => {
               <Route path="users" element={<AdminUsers />} />
               <Route path="withdrawals" element={<AdminWithdrawals />} />
               <Route path="referrals" element={<AdminReferrals />} />
-              <Route path="trainer-sessions" element={<AdminTrainerSessions />} />
-              <Route path="trainer-profile" element={<AdminTrainerProfile />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="special-sale" element={<AdminSpecialSale />} />
+              <Route path="trainer" element={<AdminTrainerManager />} />
               <Route path="category-images" element={<AdminCategoryImages />} />
               <Route path="settings" element={<AdminSettings />} />
             </Routes>

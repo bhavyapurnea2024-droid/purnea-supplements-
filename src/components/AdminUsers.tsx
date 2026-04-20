@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
-import { UserProfile, Order } from '../types';
+import { UserProfile, Order, TrainerSession } from '../types';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { X, TrendingUp, RefreshCw, Shield, User as UserIcon } from 'lucide-react';
+import { X, TrendingUp, RefreshCw, Shield, User as UserIcon, Dumbbell } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { DEFAULT_COMMISSION_RATE, DEFAULT_DISCOUNT_RATE } from '../constants';
@@ -335,12 +335,22 @@ const UserCampaignModal = ({ user, onClose }: { user: UserProfile, onClose: () =
 const AdminUsers = () => {
   const { user: adminUser } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [trainerSessions, setTrainerSessions] = useState<TrainerSession[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc')), (snapshot) => {
+    let usersLoaded = false;
+    let trainerLoaded = false;
+
+    const checkLoading = () => {
+      if (usersLoaded && trainerLoaded) {
+        setLoading(false);
+      }
+    };
+
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), orderBy('createdAt', 'desc')), (snapshot) => {
       const updatedUsers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
       setUsers(updatedUsers);
       
@@ -352,12 +362,28 @@ const AdminUsers = () => {
         }
       }
       
-      setLoading(false);
+      usersLoaded = true;
+      checkLoading();
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'users');
-      setLoading(false);
+      usersLoaded = true;
+      checkLoading();
     });
-    return () => unsub();
+
+    const unsubTrainer = onSnapshot(collection(db, 'trainer_sessions'), (snapshot) => {
+      setTrainerSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TrainerSession)));
+      trainerLoaded = true;
+      checkLoading();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'trainer_sessions');
+      trainerLoaded = true;
+      checkLoading();
+    });
+
+    return () => {
+      unsubUsers();
+      unsubTrainer();
+    };
   }, [selectedUser?.uid]);
 
   const toggleAdmin = async (userId: string, currentRole: string) => {
@@ -405,40 +431,54 @@ const AdminUsers = () => {
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Role</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Password</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Trainer</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Coupon</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Wallet</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredUsers.map(user => (
-                <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
-                        {user.photoURL ? <img src={user.photoURL} className="w-full h-full rounded-xl object-cover" referrerPolicy="no-referrer" /> : <UserIcon className="w-5 h-5" />}
+              {filteredUsers.map(user => {
+                const session = trainerSessions.find(s => s.userId === user.uid);
+                const isTrainerActive = session?.status === 'active' && new Date(session.expiresAt!) > new Date();
+                
+                return (
+                  <tr key={user.uid} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
+                          {user.photoURL ? <img src={user.photoURL} className="w-full h-full rounded-xl object-cover" referrerPolicy="no-referrer" /> : <UserIcon className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{user.displayName}</p>
+                          <p className="text-[10px] text-gray-500">{user.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{user.displayName}</p>
-                        <p className="text-[10px] text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-                      user.role === 'admin' ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-700"
-                    )}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-mono font-bold text-gray-600 bg-gray-50 px-2 py-1 rounded-lg inline-block">
-                      {user.password || 'N/A'}
-                    </p>
-                  </td>
-                  <td className="px-6 py-4">
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                        user.role === 'admin' ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-700"
+                      )}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {session ? (
+                        <div className="flex items-center gap-2">
+                          <Dumbbell className={cn("w-4 h-4", isTrainerActive ? "text-orange-600" : "text-gray-300")} />
+                          <span className={cn(
+                            "text-[10px] font-black uppercase tracking-widest",
+                            isTrainerActive ? "text-orange-600" : "text-gray-400"
+                          )}>
+                            {session.status}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No Session</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="text-sm font-black text-orange-600 tracking-widest">{user.couponCode}</span>
                       {user.isCouponDisabled && (
@@ -472,8 +512,9 @@ const AdminUsers = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              );
+            })}
+          </tbody>
           </table>
         </div>
       </div>

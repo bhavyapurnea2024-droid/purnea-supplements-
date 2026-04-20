@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2, ArrowRight } from 'lucide-react';
-import { doc, getDoc, updateDoc, addDoc, collection, increment, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, logAction } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { useCart } from '../CartContext';
 import { toast } from 'sonner';
-import { AI_TRAINER_BASE_PRICE, AI_TRAINER_SESSION_DURATION } from '../constants';
 
 const PaymentStatusPage = () => {
   const [searchParams] = useSearchParams();
@@ -27,38 +26,6 @@ const PaymentStatusPage = () => {
         const data = await response.json();
 
         if (data.order_status === 'PAID') {
-          // Check if it's a trainer order
-          if (orderId.startsWith('trainer_')) {
-            const sessionRef = doc(db, 'trainer_sessions', orderId);
-            const sessionSnap = await getDoc(sessionRef);
-
-            if (!sessionSnap.exists()) {
-              const now = new Date();
-              const expiresAt = new Date(now.getTime() + AI_TRAINER_SESSION_DURATION);
-              
-              await setDoc(sessionRef, {
-                userId: user.uid,
-                status: 'active',
-                paymentStatus: 'completed',
-                amount: AI_TRAINER_BASE_PRICE,
-                messages: [
-                  {
-                    role: 'model',
-                    text: `Namaste! I am your Personal Trainer. I'm honored to help you on your fitness journey. To create the perfect Indian diet and workout plan for you, I need to understand you better. \n\nFirst, would you like to talk in **Hinglish** or **English**?`,
-                    timestamp: new Date().toISOString()
-                  }
-                ],
-                createdAt: now.toISOString(),
-                expiresAt: expiresAt.toISOString(),
-              });
-
-              await logAction(user.uid, user.email || '', user.displayName || '', 'PURCHASE_AI_TRAINER', `Purchased Your Trainer session for ₹${AI_TRAINER_BASE_PRICE} (Cashfree Payment)`, 'user');
-              toast.success('Trainer session activated!');
-            }
-            setStatus('success');
-            return;
-          }
-
           // 2. Update Firestore order status
           const orderRef = doc(db, 'orders', orderId);
           const orderSnap = await getDoc(orderRef);
@@ -140,16 +107,14 @@ const PaymentStatusPage = () => {
           </div>
           <h2 className="text-3xl font-black text-gray-900 mb-2">Order Confirmed!</h2>
           <p className="text-gray-500 mb-8">
-            {orderId?.startsWith('trainer_') 
-              ? "Your Personal Trainer is now active and waiting for you."
-              : `Thank you for your purchase. Your order #${orderId?.slice(-6).toUpperCase()} has been placed successfully.`}
+            Thank you for your purchase. Your order #{orderId?.slice(-6).toUpperCase()} has been placed successfully.
           </p>
           <div className="space-y-3">
             <button 
-              onClick={() => navigate(orderId?.startsWith('trainer_') ? '/ai-trainer' : '/orders')}
+              onClick={() => navigate('/orders')}
               className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
             >
-              {orderId?.startsWith('trainer_') ? 'Go to Trainer Chat' : 'View Order History'} <ArrowRight className="w-5 h-5" />
+              View Order History <ArrowRight className="w-5 h-5" />
             </button>
             <button 
               onClick={() => navigate('/shop')}

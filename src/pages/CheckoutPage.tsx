@@ -125,7 +125,12 @@ const CheckoutPage = () => {
       await logAction(user.uid, user.email || '', user.displayName || '', 'INITIATE_WHATSAPP_PAYMENT', `Initiated WhatsApp payment for order #${orderId.slice(-6)} for ₹${totalAmount}`, 'user');
 
       // 2. Generate WhatsApp message
-      const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+      const itemsList = items.map(item => {
+        let details = `${item.name} (x${item.quantity})`;
+        if (item.flavor) details += ` [Flavor: ${item.flavor}]`;
+        if (item.weight) details += ` [Weight: ${item.weight}]`;
+        return details;
+      }).join(', ');
       const message = `*New Order Request*%0A%0A` +
         `*Order ID:* ${orderId}%0A` +
         `*Name:* ${address.fullName}%0A` +
@@ -221,7 +226,12 @@ const CheckoutPage = () => {
       setPaymentStep('success');
       toast.success('Payment Successful via Wallet!');
       
-      const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+      const itemsList = items.map(item => {
+        let details = `${item.name} (x${item.quantity})`;
+        if (item.flavor) details += ` [Flavor: ${item.flavor}]`;
+        if (item.weight) details += ` [Weight: ${item.weight}]`;
+        return details;
+      }).join(', ');
       const whatsappMessage = `*New Order Received (Wallet Pay)!*%0A%0A` +
         `*Order ID:* %23${orderRef.id.slice(-6).toUpperCase()}%0A` +
         `*Customer:* ${address.fullName}%0A` +
@@ -480,13 +490,17 @@ const CheckoutPage = () => {
               
               <div className="space-y-4 mb-8 max-h-64 overflow-y-auto pr-2 scrollbar-hide">
                 {items.map(item => (
-                  <div key={item.productId} className="flex items-center gap-4">
+                  <div key={`${item.productId}-${item.flavor}-${item.weight}`} className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                     <div className="flex-grow min-w-0">
                       <p className="text-xs font-bold text-gray-900 truncate uppercase">{item.name}</p>
-                      <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.flavor && <span className="text-[9px] bg-gray-100 px-1 rounded text-gray-500">F: {item.flavor}</span>}
+                        {item.weight && <span className="text-[9px] bg-gray-100 px-1 rounded text-gray-500">W: {item.weight}</span>}
+                        <span className="text-[9px] bg-gray-100 px-1 rounded text-gray-500">Qty: {item.quantity}</span>
+                      </div>
                     </div>
                     <p className="text-sm font-bold text-gray-900">₹{item.price * item.quantity}</p>
                   </div>

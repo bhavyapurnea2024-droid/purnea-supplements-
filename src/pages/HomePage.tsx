@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight } from 'lucide-react';
+import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight, Utensils, Dumbbell, MessageSquare } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -179,6 +179,51 @@ const HomePage = () => {
               {/* Decorative elements */}
               <div className="absolute -top-6 -right-6 w-24 h-24 bg-orange-400 rounded-full blur-2xl opacity-50"></div>
               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-orange-300 rounded-full blur-3xl opacity-30"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Personal Trainer Promo */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-gray-900 rounded-[3rem] overflow-hidden relative">
+            <div className="absolute inset-0 opacity-20">
+              <img 
+                src="https://picsum.photos/seed/trainer-promo/1200/600" 
+                alt="Trainer" 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="relative z-10 p-12 md:p-20 flex flex-col md:flex-row items-center justify-between gap-12">
+              <div className="max-w-xl">
+                <span className="inline-block px-3 py-1 bg-orange-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-6">New Feature</span>
+                <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter mb-6 leading-none uppercase">
+                  GET YOUR PERSONAL <br /> <span className="text-orange-600">TRAINER NOW 💪</span>
+                </h2>
+                <p className="text-gray-400 text-lg mb-8">
+                  Custom workout plans, Indian diet charts, and direct 1-on-1 support. Everything you need to transform your body manually guided by our experts.
+                </p>
+                <Link to="/trainer" className="bg-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-orange-700 transition-all flex items-center gap-2 w-fit group">
+                  Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: 'Custom Diet', icon: Utensils },
+                  { icon: Dumbbell, label: 'Workout Plan' },
+                  { icon: MessageSquare, label: '1-on-1 Chat' },
+                  { icon: Zap, label: 'Fast Results' }
+                ].map((item, i) => (
+                  <div key={i} className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 flex flex-col items-center text-center">
+                    <div className="w-10 h-10 bg-orange-600/20 text-orange-500 rounded-xl flex items-center justify-center mb-3">
+                      <item.icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-black text-white uppercase tracking-widest">{item.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

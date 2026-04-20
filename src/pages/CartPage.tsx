@@ -51,7 +51,7 @@ const CartPage = () => {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  key={item.productId}
+                  key={`${item.productId}-${item.flavor}-${item.weight}`}
                   className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-6 items-center group"
                 >
                   <Link to={`/product/${item.productId}`} className="w-32 h-32 rounded-2xl overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-100">
@@ -62,26 +62,40 @@ const CartPage = () => {
                     <Link to={`/product/${item.productId}`}>
                       <h3 className="font-black text-gray-900 text-xl leading-tight mb-2 group-hover:text-orange-600 transition-colors uppercase">{item.name}</h3>
                     </Link>
+                    
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {item.flavor && (
+                        <span className="px-3 py-1 bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-gray-100">
+                          Flavor: {item.flavor}
+                        </span>
+                      )}
+                      {item.weight && (
+                        <span className="px-3 py-1 bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-gray-100">
+                          Weight: {item.weight}
+                        </span>
+                      )}
+                    </div>
+
                     <p className="text-2xl font-black text-gray-900 mb-4 tracking-tight">₹{item.price}</p>
                     
                     <div className="flex items-center justify-center sm:justify-start gap-6">
                       <div className="flex items-center bg-gray-100 rounded-xl p-1">
                         <button 
-                          onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.productId, item.quantity - 1, item.flavor, item.weight)}
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-orange-600 rounded-lg transition-all"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="w-10 text-center font-bold text-gray-900">{item.quantity}</span>
                         <button 
-                          onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.productId, item.quantity + 1, item.flavor, item.weight)}
                           className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-white hover:text-orange-600 rounded-lg transition-all"
                         >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
                       <button 
-                        onClick={() => removeFromCart(item.productId)}
+                        onClick={() => removeFromCart(item.productId, item.flavor, item.weight)}
                         className="text-gray-400 hover:text-red-600 transition-colors p-2"
                       >
                         <Trash2 className="w-5 h-5" />

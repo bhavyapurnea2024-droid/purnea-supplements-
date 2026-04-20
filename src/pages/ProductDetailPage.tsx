@@ -15,6 +15,8 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
+  const [selectedFlavor, setSelectedFlavor] = useState<string>('');
+  const [selectedWeight, setSelectedWeight] = useState<string>('');
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
@@ -41,16 +43,43 @@ const ProductDetailPage = () => {
     fetchProduct();
   }, [id, navigate]);
 
+  useEffect(() => {
+    if (product) {
+      if (product.flavors && product.flavors.length > 0 && !selectedFlavor) {
+        setSelectedFlavor(product.flavors[0]);
+      }
+      if (product.weights && product.weights.length > 0 && !selectedWeight) {
+        setSelectedWeight(product.weights[0]);
+      }
+    }
+  }, [product]);
+
   const handleAddToCart = () => {
     if (product) {
-      addToCart(product, quantity);
+      if (product.flavors?.length && !selectedFlavor) {
+        toast.error('Please select a flavor');
+        return;
+      }
+      if (product.weights?.length && !selectedWeight) {
+        toast.error('Please select a weight');
+        return;
+      }
+      addToCart(product, quantity, selectedFlavor, selectedWeight);
       toast.success(`${product.name} added to cart`);
     }
   };
 
   const handleBuyNow = () => {
     if (product) {
-      addToCart(product, quantity);
+      if (product.flavors?.length && !selectedFlavor) {
+        toast.error('Please select a flavor');
+        return;
+      }
+      if (product.weights?.length && !selectedWeight) {
+        toast.error('Please select a weight');
+        return;
+      }
+      addToCart(product, quantity, selectedFlavor, selectedWeight);
       navigate('/checkout');
     }
   };
@@ -161,6 +190,53 @@ const ProductDetailPage = () => {
                 )}
               </div>
               <p className="text-xs text-gray-500">Inclusive of all taxes. Free shipping on orders above ₹999.</p>
+            </div>
+
+            {/* Options Selection */}
+            <div className="space-y-6 mb-8">
+              {product.flavors && product.flavors.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">Select Flavor</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {product.flavors.map(flavor => (
+                      <button
+                        key={flavor}
+                        onClick={() => setSelectedFlavor(flavor)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all",
+                          selectedFlavor === flavor 
+                            ? "border-orange-600 bg-orange-50 text-orange-600" 
+                            : "border-gray-100 bg-white text-gray-500 hover:border-gray-200"
+                        )}
+                      >
+                        {flavor}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {product.weights && product.weights.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-3">Select Weight</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {product.weights.map(weight => (
+                      <button
+                        key={weight}
+                        onClick={() => setSelectedWeight(weight)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all",
+                          selectedWeight === weight 
+                            ? "border-orange-600 bg-orange-50 text-orange-600" 
+                            : "border-gray-100 bg-white text-gray-500 hover:border-gray-200"
+                        )}
+                      >
+                        {weight}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-8 mb-12">

@@ -116,6 +116,7 @@ export const AdminAnalytics = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [trainerSessions, setTrainerSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Date range state
@@ -126,9 +127,10 @@ export const AdminAnalytics = () => {
     let ordersLoaded = false;
     let usersLoaded = false;
     let referralsLoaded = false;
+    let trainerLoaded = false;
 
     const checkLoading = () => {
-      if (ordersLoaded && usersLoaded && referralsLoaded) {
+      if (ordersLoaded && usersLoaded && referralsLoaded && trainerLoaded) {
         setLoading(false);
       }
     };
@@ -163,10 +165,21 @@ export const AdminAnalytics = () => {
       checkLoading();
     });
 
+    const unsubTrainer = onSnapshot(collection(db, 'trainer_sessions'), (snapshot) => {
+      setTrainerSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      trainerLoaded = true;
+      checkLoading();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'trainer_sessions');
+      trainerLoaded = true;
+      checkLoading();
+    });
+
     return () => {
       unsubOrders();
       unsubUsers();
       unsubReferrals();
+      unsubTrainer();
     };
   }, []);
 
@@ -195,16 +208,32 @@ export const AdminAnalytics = () => {
     return refDate >= start && refDate <= end;
   });
 
+  const filteredTrainer = trainerSessions.filter(session => {
+    if (!session.paymentVerified) return false;
+    if (!startDate && !endDate) return true;
+    const sessionDate = new Date(session.createdAt).getTime();
+    const start = startDate ? new Date(startDate).getTime() : 0;
+    const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : Infinity;
+    return sessionDate >= start && sessionDate <= end;
+  });
+
   // Summary Metrics
-  const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-  const totalOrders = filteredOrders.length;
+  const productRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+  const trainerRevenue = filteredTrainer.reduce((sum, s) => sum + (s.couponUsed ? 500 : 549), 0);
+  const totalRevenue = productRevenue + trainerRevenue;
+  
+  const totalOrders = filteredOrders.length + filteredTrainer.length;
   const newUsers = filteredUsers.length;
-  const totalCommissions = filteredReferrals.reduce((sum, ref) => sum + ref.amount, 0);
+  
+  const productCommissions = filteredReferrals.reduce((sum, ref) => sum + ref.amount, 0);
+  const trainerCommissions = filteredTrainer.filter(s => s.referralUserId).length * 100;
+  const totalCommissions = productCommissions + trainerCommissions;
 
   // Process daily revenue for line chart
-  const dailyRevenue = filteredOrders.reduce((acc: any, order) => {
-    const date = new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    acc[date] = (acc[date] || 0) + order.totalAmount;
+  const dailyRevenue = [...filteredOrders, ...filteredTrainer].reduce((acc: any, item) => {
+    const date = new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const amount = 'totalAmount' in item ? item.totalAmount : (item.couponUsed ? 500 : 549);
+    acc[date] = (acc[date] || 0) + amount;
     return acc;
   }, {});
 
@@ -217,9 +246,10 @@ export const AdminAnalytics = () => {
   });
 
   // Process data for charts
-  const revenueByMonth = filteredOrders.reduce((acc: any, order) => {
-    const month = new Date(order.createdAt).toLocaleString('default', { month: 'short' });
-    acc[month] = (acc[month] || 0) + order.totalAmount;
+  const revenueByMonth = [...filteredOrders, ...filteredTrainer].reduce((acc: any, item) => {
+    const month = new Date(item.createdAt).toLocaleString('default', { month: 'short' });
+    const amount = 'totalAmount' in item ? item.totalAmount : (item.couponUsed ? 500 : 549);
+    acc[month] = (acc[month] || 0) + amount;
     return acc;
   }, {});
 

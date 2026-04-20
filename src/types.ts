@@ -35,6 +35,8 @@ export interface Product {
   goal: 'muscle-gain' | 'fat-loss' | 'general-health' | 'performance';
   stock: number;
   images: string[];
+  flavors?: string[];
+  weights?: string[];
   rating: number;
   numReviews: number;
   commissionRate?: number; // Custom commission rate for this specific product
@@ -49,6 +51,8 @@ export interface OrderItem {
   quantity: number;
   image: string;
   category: string;
+  flavor?: string;
+  weight?: string;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -116,50 +120,34 @@ export interface AuditLog {
 export interface TrainerSession {
   id: string;
   userId: string;
-  status: 'pending' | 'active' | 'completed' | 'expired';
-  paymentStatus: 'pending' | 'completed' | 'failed';
-  amount: number;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  status: 'pending_payment' | 'active' | 'completed' | 'expired';
+  paymentVerified: boolean;
+  activatedAt?: string;
+  expiresAt?: string;
+  formSubmitted: boolean;
+  formData?: Record<string, string | string[]>;
   messages: TrainerMessage[];
+  lastAdminReplyAt?: string;
   dietPlan?: string;
   workoutPlan?: string;
-  answers?: Record<string, string>;
-  userProfile?: {
-    goal: string;
-    activityLevel: string;
-    dietType: string;
-    workoutDays: string;
-    workoutLocation: string;
-    routine: string;
-    gender: string;
-    age: string;
-    height: string;
-    heightFeet: string;
-    heightInches: string;
-    weight: string;
-    sleep: string;
-    medical: string;
-    language: string;
-  };
-  isPlanPending?: boolean;
-  planPendingAt?: string;
-  planSent?: boolean;
-  planSentAt?: string;
-  isFirstReply?: boolean;
-  lastErrorAt?: string;
-  excuseSentAt?: string;
-  lastTrainerMessageAt?: string;
-  lastUserMessageAt?: string;
-  lastUserActivityAt?: string;
-  couponUsed?: string;
   referralUserId?: string;
-  referralPaid?: boolean;
-  isAiEnabled?: boolean;
+  couponUsed?: string;
   createdAt: string;
-  expiresAt: string;
 }
 
 export interface TrainerMessage {
-  role: 'user' | 'model';
+  role: 'user' | 'admin';
   text: string;
   timestamp: string;
+}
+
+export interface TrainerProfile {
+  name: string;
+  bio: string;
+  experience: string;
+  photoURL?: string;
+  updatedAt: string;
 }

@@ -26,6 +26,8 @@ const AdminProducts = () => {
     goal: GOALS[0].id,
     stock: 0,
     images: [''],
+    flavors: '',
+    weights: '',
     commissionRate: 0.05,
     specialOffer: '',
   });
@@ -49,6 +51,8 @@ const AdminProducts = () => {
     try {
       const productData = {
         ...formData,
+        flavors: formData.flavors ? formData.flavors.split(',').map(f => f.trim()).filter(f => f) : [],
+        weights: formData.weights ? formData.weights.split(',').map(w => w.trim()).filter(w => w) : [],
         rating: editingProduct?.rating || 5,
         numReviews: editingProduct?.numReviews || 0,
         createdAt: editingProduct?.createdAt || new Date().toISOString(),
@@ -65,7 +69,21 @@ const AdminProducts = () => {
       }
       setIsModalOpen(false);
       setEditingProduct(null);
-      setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: DEFAULT_COMMISSION_RATE, specialOffer: '' });
+      setFormData({ 
+        name: '', 
+        description: '', 
+        price: 0, 
+        discountPrice: 0, 
+        category: CATEGORIES[0], 
+        brand: '', 
+        goal: GOALS[0].id, 
+        stock: 0, 
+        images: [''], 
+        flavors: '',
+        weights: '',
+        commissionRate: DEFAULT_COMMISSION_RATE, 
+        specialOffer: '' 
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'products');
     } finally {
@@ -94,7 +112,21 @@ const AdminProducts = () => {
         <button 
           onClick={() => {
             setEditingProduct(null);
-            setFormData({ name: '', description: '', price: 0, discountPrice: 0, category: CATEGORIES[0], brand: '', goal: GOALS[0].id, stock: 0, images: [''], commissionRate: 0.05, specialOffer: '' });
+            setFormData({ 
+              name: '', 
+              description: '', 
+              price: 0, 
+              discountPrice: 0, 
+              category: CATEGORIES[0], 
+              brand: '', 
+              goal: GOALS[0].id, 
+              stock: 0, 
+              images: [''], 
+              flavors: '',
+              weights: '',
+              commissionRate: 0.05, 
+              specialOffer: '' 
+            });
             setIsModalOpen(true);
           }}
           className="bg-orange-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-orange-700 shadow-xl shadow-orange-600/20 transition-all flex items-center gap-2"
@@ -155,6 +187,8 @@ const AdminProducts = () => {
                             goal: product.goal,
                             stock: product.stock,
                             images: product.images,
+                            flavors: (product.flavors || []).join(', '),
+                            weights: (product.weights || []).join(', '),
                             commissionRate: product.commissionRate || 0.05,
                             specialOffer: product.specialOffer || '',
                           });
@@ -325,6 +359,26 @@ const AdminProducts = () => {
                         onChange={(e) => setFormData({...formData, images: [e.target.value]})}
                         className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20"
                         placeholder="https://..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Flavors (Comma separated)</label>
+                      <input 
+                        type="text" 
+                        value={formData.flavors}
+                        onChange={(e) => setFormData({...formData, flavors: e.target.value})}
+                        className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20"
+                        placeholder="e.g. Chocolate, Vanilla, Strawberry"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Weights (Comma separated)</label>
+                      <input 
+                        type="text" 
+                        value={formData.weights}
+                        onChange={(e) => setFormData({...formData, weights: e.target.value})}
+                        className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 focus:ring-2 ring-orange-500/20"
+                        placeholder="e.g. 1KG, 2KG, 5KG"
                       />
                     </div>
                   </div>

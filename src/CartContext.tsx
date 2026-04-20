@@ -3,9 +3,9 @@ import { OrderItem, Product } from './types';
 
 interface CartContextType {
   items: OrderItem[];
-  addToCart: (product: Product, quantity?: number) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, quantity?: number, flavor?: string, weight?: string) => void;
+  removeFromCart: (productId: string, flavor?: string, weight?: string) => void;
+  updateQuantity: (productId: string, quantity: number, flavor?: string, weight?: string) => void;
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
@@ -29,12 +29,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cart', JSON.stringify(items));
   }, [items]);
 
-  const addToCart = (product: Product, quantity = 1) => {
+  const addToCart = (product: Product, quantity = 1, flavor?: string, weight?: string) => {
     setItems(prev => {
-      const existing = prev.find(item => item.productId === product.id);
+      const existing = prev.find(item => 
+        item.productId === product.id && 
+        item.flavor === flavor && 
+        item.weight === weight
+      );
       if (existing) {
         return prev.map(item => 
-          item.productId === product.id 
+          (item.productId === product.id && item.flavor === flavor && item.weight === weight)
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
@@ -46,21 +50,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         quantity,
         image: product.images[0] || 'https://picsum.photos/seed/supplement/200/200',
         category: product.category,
+        flavor,
+        weight,
       }];
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setItems(prev => prev.filter(item => item.productId !== productId));
+  const removeFromCart = (productId: string, flavor?: string, weight?: string) => {
+    setItems(prev => prev.filter(item => 
+      !(item.productId === productId && item.flavor === flavor && item.weight === weight)
+    ));
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number, flavor?: string, weight?: string) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(productId, flavor, weight);
       return;
     }
     setItems(prev => prev.map(item => 
-      item.productId === productId ? { ...item, quantity } : item
+      (item.productId === productId && item.flavor === flavor && item.weight === weight)
+        ? { ...item, quantity } 
+        : item
     ));
   };
 

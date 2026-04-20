@@ -207,27 +207,18 @@ service cloud.firestore {
     }
 
     function isValidTrainerSession(data) {
-      return hasRequiredFields(['userId', 'status', 'paymentStatus', 'amount', 'messages', 'createdAt', 'expiresAt']) &&
+      return hasRequiredFields(['userId', 'status', 'paymentVerified', 'formSubmitted', 'messages', 'createdAt']) &&
              data.userId is string &&
-             data.status in ['pending', 'active', 'completed', 'expired'] &&
-             data.paymentStatus in ['pending', 'completed', 'failed'] &&
-             data.amount is number &&
+             data.status in ['pending_payment', 'active', 'completed', 'expired'] &&
+             data.paymentVerified is bool &&
+             data.formSubmitted is bool &&
              data.messages is list &&
-             (!('couponUsed' in data) || data.couponUsed is string || data.couponUsed == null) &&
-             (!('referralUserId' in data) || data.referralUserId is string || data.referralUserId == null) &&
-             (!('isAiEnabled' in data) || data.isAiEnabled is bool) &&
-             (!('lastTrainerMessageAt' in data) || isValidDateString(data.lastTrainerMessageAt)) &&
-             (!('lastUserMessageAt' in data) || isValidDateString(data.lastUserMessageAt)) &&
-             (!('lastUserActivityAt' in data) || isValidDateString(data.lastUserActivityAt)) &&
-             isValidDateString(data.createdAt) &&
-             isValidDateString(data.expiresAt);
+             isValidDateString(data.createdAt);
     }
 
     function isValidTrainerProfile(data) {
-      return hasOnlyAllowedFields(['name', 'image', 'bio', 'updatedAt']) &&
+      return hasRequiredFields(['name', 'updatedAt']) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             isValidOptionalString('image', 0, 1000) &&
-             isValidOptionalString('bio', 0, 2000) &&
              isValidDateString(data.updatedAt);
     }
 
@@ -240,13 +231,8 @@ service cloud.firestore {
     }
 
     match /trainer_sessions/{sessionId} {
-      // Users can read their own sessions. Admins can read all.
       allow read, list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-      
-      // Users can create sessions for themselves.
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidTrainerSession(request.resource.data);
-      
-      // Users can update their own active sessions (to add messages).
       allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid && isValidTrainerSession(request.resource.data));
     }
 
@@ -328,8 +314,7 @@ service cloud.firestore {
       allow read, list: if true;
       
       // Only global admin can manage global settings.
-      // Regular admins can manage the trainer profile.
-      allow write: if isGlobalAdmin() || (isAdmin() && settingId == 'trainer' && isValidTrainerProfile(request.resource.data));
+      allow write: if isGlobalAdmin();
     }
 
     match /audit_logs/{logId} {

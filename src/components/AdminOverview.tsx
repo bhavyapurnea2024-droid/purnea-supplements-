@@ -5,7 +5,7 @@ import { Order, Product, UserProfile, Referral, WithdrawalRequest } from '../typ
 import { useAuth } from '../AuthContext';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ShoppingBag, Package, Users, Ticket, Dumbbell, MessageSquare } from 'lucide-react';
+import { ShoppingBag, Package, Users, Ticket } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { 
   ResponsiveContainer, 
@@ -25,21 +25,11 @@ const AdminOverview = () => {
     totalUsers: 0,
     totalCommission: 0,
     totalProducts: 0,
-    trainerRevenue: 0,
-    trainerSessions: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [salesData, setSalesData] = useState<any[]>([]);
 
   useEffect(() => {
-    const unsubTrainer = onSnapshot(collection(db, 'trainer_sessions'), (snapshot) => {
-      const sessions = snapshot.docs.map(doc => doc.data());
-      const revenue = sessions.reduce((sum, s) => sum + (s.amount || 0), 0);
-      setStats(prev => ({ ...prev, trainerRevenue: revenue, trainerSessions: snapshot.size }));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'trainer_sessions');
-    });
-
     const unsubOrders = onSnapshot(query(collection(db, 'orders'), orderBy('createdAt', 'desc')), (snapshot) => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setRecentOrders(orders.slice(0, 5));
@@ -93,7 +83,6 @@ const AdminOverview = () => {
       unsubUsers();
       unsubReferrals();
       unsubProducts();
-      unsubTrainer();
     };
   }, []);
 
@@ -112,8 +101,6 @@ const AdminOverview = () => {
           { label: 'Total Orders', value: stats.totalOrders, icon: Package, color: 'blue' },
           { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'purple' },
           { label: 'Commission Paid', value: `₹${stats.totalCommission.toLocaleString()}`, icon: Ticket, color: 'green' },
-          { label: 'Trainer Revenue', value: `₹${stats.trainerRevenue.toLocaleString()}`, icon: Dumbbell, color: 'orange' },
-          { label: 'Trainer Sessions', value: stats.trainerSessions, icon: MessageSquare, color: 'blue' },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
             <div className={cn(
