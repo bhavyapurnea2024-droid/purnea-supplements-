@@ -176,6 +176,18 @@ const CheckoutPage = () => {
       };
       
       await setDoc(doc(db, 'orders', orderId), orderData);
+      
+      // Update sales count for each product
+      for (const item of items) {
+        try {
+          const productRef = doc(db, 'products', item.productId);
+          await updateDoc(productRef, {
+            salesCount: increment(item.quantity)
+          });
+        } catch (err) {
+          console.error(`Failed to update sales count for ${item.productId}:`, err);
+        }
+      }
 
       if (appliedCoupon) {
         const commissionAmount = appliedCoupon.applicableSubtotal * appliedCoupon.commissionRate;
@@ -263,6 +275,18 @@ const CheckoutPage = () => {
       };
 
       const orderRef = await addDoc(collection(db, 'orders'), orderData);
+      
+      // Update sales count for each product
+      for (const item of items) {
+        try {
+          const productRef = doc(db, 'products', item.productId);
+          await updateDoc(productRef, {
+            salesCount: increment(item.quantity)
+          });
+        } catch (err) {
+          console.error(`Failed to update sales count for ${item.productId}:`, err);
+        }
+      }
       
       // Deduct from wallet
       const userRef = doc(db, 'users', user.uid);

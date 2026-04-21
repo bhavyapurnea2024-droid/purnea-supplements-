@@ -50,6 +50,7 @@ export interface Product {
   weights?: string[];
   rating: number;
   numReviews: number;
+  salesCount: number;
   commissionRate?: number; // Custom commission rate for this specific product
   specialOffer?: string; // Text for special offer badge
   createdAt: string;

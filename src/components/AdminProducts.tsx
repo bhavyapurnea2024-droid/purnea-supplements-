@@ -63,6 +63,7 @@ const AdminProducts = () => {
         weights: formData.weights ? formData.weights.split(',').map(w => w.trim()).filter(w => w) : [],
         rating: editingProduct?.rating || 5,
         numReviews: editingProduct?.numReviews || 0,
+        salesCount: editingProduct?.salesCount ?? (Math.floor(Math.random() * 51) + 50),
         createdAt: editingProduct?.createdAt || new Date().toISOString(),
       };
 

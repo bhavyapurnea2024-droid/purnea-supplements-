@@ -4,7 +4,7 @@ import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestor
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Product } from '../types';
 import { CATEGORIES, GOALS } from '../constants';
-import { Search, Filter, Star, ShoppingCart, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, Star, ShoppingCart, ChevronRight, SlidersHorizontal, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCart } from '../CartContext';
 import { toast } from 'sonner';
@@ -202,6 +202,11 @@ const ProductListingPage = () => {
                         <Star className="w-2.5 h-2.5 text-orange-500 fill-current" />
                         <span className="text-[10px] font-bold text-gray-900">{product.rating}</span>
                         <span className="text-[10px] text-gray-400">({product.numReviews})</span>
+                        <span className="mx-1 text-gray-300">|</span>
+                        <TrendingUp className="w-2.5 h-2.5 text-green-600" />
+                        <span className="text-[10px] font-bold text-green-600">
+                          {product.salesCount || (50 + (product.id.charCodeAt(0) % 51))}+ bought
+                        </span>
                       </div>
                       <Link to={`/product/${product.id}`}>
                         <h3 className="font-black text-gray-900 text-xs sm:text-base leading-tight mb-2 group-hover:text-orange-600 transition-colors uppercase truncate">{product.name}</h3>
