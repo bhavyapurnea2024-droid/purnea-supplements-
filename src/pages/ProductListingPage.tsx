@@ -42,6 +42,14 @@ const ProductListingPage = () => {
         
       setProducts(filtered);
       setLoading(false);
+
+      // Preload the first few product images
+      filtered.slice(0, 6).forEach(product => {
+        if (product.images?.[0]) {
+          const img = new Image();
+          img.src = product.images[0];
+        }
+      });
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'products');
       setLoading(false);

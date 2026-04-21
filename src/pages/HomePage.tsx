@@ -9,12 +9,34 @@ import { db } from '../firebase';
 const HomePage = () => {
   const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
 
+  // Helper to preload images
+  const preloadImage = (src: string) => {
+    if (!src) return;
+    const img = new Image();
+    img.src = src;
+  };
+
   useEffect(() => {
+    // Immediate preloads for known static images
+    preloadImage("https://picsum.photos/seed/fitness-hero/1920/1080");
+    preloadImage("https://picsum.photos/seed/trainer-promo/1920/1080");
+    
+    // Preload default category fallbacks immediately
+    CATEGORIES.slice(0, 6).forEach(cat => {
+      preloadImage(`https://picsum.photos/seed/${cat}/800/800`);
+    });
+
     const fetchImages = async () => {
       try {
         const docSnap = await getDoc(doc(db, 'settings', 'category_images'));
         if (docSnap.exists()) {
-          setCategoryImages(docSnap.data() as Record<string, string>);
+          const images = docSnap.data() as Record<string, string>;
+          setCategoryImages(images);
+          
+          // Preload custom URLs as soon as they are retrieved
+          Object.values(images).forEach(url => {
+            if (url) preloadImage(url);
+          });
         }
       } catch (error) {
         console.error('Error fetching category images:', error);
@@ -31,8 +53,11 @@ const HomePage = () => {
           <img 
             src="https://picsum.photos/seed/fitness-hero/1920/1080" 
             alt="Hero Background" 
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover bg-gray-900 img-fade-in"
             referrerPolicy="no-referrer"
+            loading="eager"
+            decoding="async"
+            {...{ fetchPriority: "high" }} 
           />
           <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-transparent"></div>
         </div>
@@ -116,8 +141,11 @@ const HomePage = () => {
                     <img 
                       src={categoryImages[cat] || `https://picsum.photos/seed/${cat}/800/800`} 
                       alt={cat} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 blur-0" 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 blur-0 bg-gray-100 img-fade-in" 
                       referrerPolicy="no-referrer" 
+                      loading="eager"
+                      decoding="async"
+                      {...{ fetchPriority: i < 3 ? "high" : "auto" }}
                     />
                     {/* Dark gradient at bottom to help with text if needed, but we'll use a white background for the label */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -208,8 +236,9 @@ const HomePage = () => {
               <img 
                 src="https://picsum.photos/seed/trainer-promo/1920/1080" 
                 alt="Trainer" 
-                className="w-full h-full object-cover grayscale-[20%] group-hover:scale-105 transition-transform duration-700"
+                className="w-full h-full object-cover grayscale-[20%] group-hover:scale-105 transition-transform duration-700 bg-gray-800 img-fade-in"
                 referrerPolicy="no-referrer"
+                decoding="async"
               />
             </div>
             <div className="relative z-10 p-12 md:p-20 flex flex-col md:flex-row items-center justify-between gap-12">
