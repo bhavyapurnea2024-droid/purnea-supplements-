@@ -164,13 +164,13 @@ const ProductListingPage = () => {
           {/* Product Grid */}
           <div className="lg:col-span-3">
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl h-96 animate-pulse border border-gray-100"></div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl h-80 animate-pulse border border-gray-100"></div>
                 ))}
               </div>
             ) : products.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-6">
                 {products.map((product) => (
                   <motion.div 
                     layout
@@ -179,11 +179,11 @@ const ProductListingPage = () => {
                     key={product.id}
                     className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all overflow-hidden flex flex-col"
                   >
-                    <Link to={`/product/${product.id}`} className="relative h-64 overflow-hidden bg-white flex items-center justify-center">
+                    <Link to={`/product/${product.id}`} className="relative h-48 sm:h-56 xl:h-64 overflow-hidden bg-white flex items-center justify-center">
                       <img 
                         src={product.images[0] || 'https://picsum.photos/seed/supplement/800/800'} 
                         alt={product.name} 
-                        className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                        className="max-w-[85%] max-h-[85%] object-contain group-hover:scale-110 transition-transform duration-500"
                         referrerPolicy="no-referrer"
                       />
                       {product.discountPrice && (
@@ -197,39 +197,39 @@ const ProductListingPage = () => {
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
                     </Link>
                     
-                    <div className="p-6 flex-grow flex flex-col">
+                    <div className="p-4 sm:p-6 flex-grow flex flex-col">
                       <div className="flex items-center gap-1 mb-2">
-                        <Star className="w-3 h-3 text-orange-500 fill-current" />
-                        <span className="text-xs font-bold text-gray-900">{product.rating}</span>
-                        <span className="text-xs text-gray-400">({product.numReviews})</span>
+                        <Star className="w-2.5 h-2.5 text-orange-500 fill-current" />
+                        <span className="text-[10px] font-bold text-gray-900">{product.rating}</span>
+                        <span className="text-[10px] text-gray-400">({product.numReviews})</span>
                       </div>
                       <Link to={`/product/${product.id}`}>
-                        <h3 className="font-black text-gray-900 text-lg leading-tight mb-2 group-hover:text-orange-600 transition-colors uppercase truncate">{product.name}</h3>
+                        <h3 className="font-black text-gray-900 text-xs sm:text-base leading-tight mb-2 group-hover:text-orange-600 transition-colors uppercase truncate">{product.name}</h3>
                       </Link>
-                      <p className="text-xs text-gray-500 mb-4 line-clamp-2">{product.description}</p>
+                      <p className="text-[10px] text-gray-500 mb-4 line-clamp-2 hidden sm:block">{product.description}</p>
                       
-                      <div className="mt-auto flex items-center justify-between">
-                        <div>
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        <div className="flex flex-col">
                           {product.discountPrice ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl font-black text-gray-900">₹{product.discountPrice}</span>
-                              <span className="text-sm text-gray-400 line-through">₹{product.price}</span>
-                            </div>
+                            <>
+                              <span className="text-sm sm:text-lg font-black text-gray-900">₹{product.discountPrice}</span>
+                              <span className="text-[10px] text-gray-400 line-through">₹{product.price}</span>
+                            </>
                           ) : (
-                            <span className="text-xl font-black text-gray-900">₹{product.price}</span>
+                            <span className="text-sm sm:text-lg font-black text-gray-900">₹{product.price}</span>
                           )}
                         </div>
                         <button 
                           onClick={(e) => handleAddToCart(e, product)}
                           disabled={product.stock <= 0}
                           className={cn(
-                            "p-3 rounded-xl transition-all active:scale-95",
+                            "p-2 sm:p-3 rounded-xl transition-all active:scale-95",
                             product.stock > 0 
                               ? "bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-600/20" 
                               : "bg-gray-100 text-gray-400 cursor-not-allowed"
                           )}
                         >
-                          <ShoppingCart className="w-5 h-5" />
+                          <ShoppingCart className="w-4 h-4 sm:w-5 h-5" />
                         </button>
                       </div>
                     </div>

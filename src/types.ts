@@ -108,6 +108,10 @@ export interface Referral {
 export interface WithdrawalRequest {
   id: string;
   userId: string;
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  referralCode?: string;
   amount: number;
   status: 'pending' | 'approved' | 'rejected';
   upiId?: string;

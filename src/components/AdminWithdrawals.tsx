@@ -14,9 +14,7 @@ const AdminWithdrawals = () => {
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'withdrawals'), orderBy('createdAt', 'desc')), (snapshot) => {
       const allWithdrawals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest));
-      // Only show requests that are visible (12h delay)
-      const visibleWithdrawals = allWithdrawals.filter(w => !w.visibleAt || new Date(w.visibleAt) <= new Date());
-      setWithdrawals(visibleWithdrawals);
+      setWithdrawals(allWithdrawals);
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'withdrawals');
     });
@@ -59,9 +57,9 @@ const AdminWithdrawals = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User ID</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User Details</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">UPI ID</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Withdrawal Info</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
               </tr>
@@ -69,17 +67,36 @@ const AdminWithdrawals = () => {
             <tbody className="divide-y divide-gray-50">
               {withdrawals.map(w => (
                 <tr key={w.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-xs text-gray-500 font-mono">{w.userId}</td>
-                  <td className="px-6 py-4 text-sm font-black text-gray-900">₹{w.amount}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{w.upiId}</td>
                   <td className="px-6 py-4">
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-                      w.status === 'approved' ? "bg-green-100 text-green-700" : 
-                      w.status === 'pending' ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"
-                    )}>
-                      {w.status}
-                    </span>
+                    <div className="flex flex-col">
+                      <p className="text-sm font-black text-gray-900 uppercase tracking-tight">{w.userName || 'Unknown'}</p>
+                      <p className="text-[10px] text-gray-500 font-bold">{w.userEmail}</p>
+                      <p className="text-[10px] text-orange-600 font-black tracking-widest mt-1">CODE: {w.referralCode || 'N/A'}</p>
+                      <p className="text-[10px] text-gray-400 font-mono mt-1">{w.userId}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-black text-gray-900">₹{w.amount}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <p className="text-sm text-gray-600 font-bold">{w.upiId}</p>
+                      {w.userPhone && <p className="text-[10px] text-gray-400 font-bold">{w.userPhone}</p>}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest w-fit",
+                        w.status === 'approved' ? "bg-green-100 text-green-700" : 
+                        w.status === 'pending' ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"
+                      )}>
+                        {w.status}
+                      </span>
+                      {w.status === 'pending' && w.visibleAt && new Date(w.visibleAt) > new Date() && (
+                        <span className="text-[8px] font-bold text-blue-600 uppercase tracking-tighter animate-pulse">
+                          (Pending 12h Delay)
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     {w.status === 'pending' && (

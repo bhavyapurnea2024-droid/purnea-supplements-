@@ -599,6 +599,7 @@ const AdminUsers = () => {
     user.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.uid?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.couponCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (user.phoneNumber && user.phoneNumber.includes(searchQuery))
   );
 

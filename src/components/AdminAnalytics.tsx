@@ -186,6 +186,7 @@ export const AdminAnalytics = () => {
 
   // Filter data based on date range
   const filteredOrders = orders.filter(order => {
+    if (order.status !== 'delivered') return false;
     if (!startDate && !endDate) return true;
     const orderDate = new Date(order.createdAt).getTime();
     const start = startDate ? new Date(startDate).getTime() : 0;
@@ -226,7 +227,9 @@ export const AdminAnalytics = () => {
   const totalOrders = filteredOrders.length + filteredTrainer.length;
   const newUsers = filteredUsers.length;
   
-  const productCommissions = filteredReferrals.reduce((sum, ref) => sum + ref.amount, 0);
+  const productCommissions = filteredReferrals
+    .filter(ref => ref.status === 'earned' || ref.status === 'matured')
+    .reduce((sum, ref) => sum + ref.amount, 0);
   const trainerCommissions = filteredTrainer.filter(s => s.referralUserId).length * 100;
   const totalCommissions = productCommissions + trainerCommissions;
 

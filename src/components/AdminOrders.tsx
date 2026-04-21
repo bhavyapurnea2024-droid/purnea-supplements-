@@ -128,6 +128,7 @@ const AdminOrders = () => {
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Customer</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Address</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Items</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Coupon</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Total</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Method</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
@@ -161,6 +162,15 @@ const AdminOrders = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{order.items.length} items</td>
+                  <td className="px-6 py-4">
+                    {order.couponUsed ? (
+                      <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm border border-orange-100">
+                        {order.couponUsed}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">None</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm font-black text-gray-900">₹{order.totalAmount}</td>
                   <td className="px-6 py-4">
                     <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">

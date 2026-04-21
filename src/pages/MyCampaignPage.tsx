@@ -100,6 +100,10 @@ const MyCampaignPage = () => {
       const visibleAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
       await addDoc(collection(db, 'withdrawals'), {
         userId: user.uid,
+        userName: profile.displayName || 'Unknown',
+        userEmail: profile.email || '',
+        userPhone: profile.phoneNumber || '',
+        referralCode: profile.couponCode || '',
         amount: withdrawAmount,
         status: 'pending',
         upiId,
@@ -112,6 +116,9 @@ const MyCampaignPage = () => {
       const whatsappMessage = `*New Withdrawal Request!*%0A%0A` +
         `*User ID:* ${user.uid}%0A` +
         `*Customer:* ${profile?.displayName || user.displayName || 'Customer'}%0A` +
+        `*Email:* ${profile?.email || 'N/A'}%0A` +
+        `*Phone:* ${profile?.phoneNumber || 'N/A'}%0A` +
+        `*Referral Code:* ${profile?.couponCode || 'N/A'}%0A` +
         `*Amount:* ₹${withdrawAmount}%0A` +
         `*UPI ID:* ${upiId}%0A%0A` +
         `_Please process this withdrawal after 12 hours._`;

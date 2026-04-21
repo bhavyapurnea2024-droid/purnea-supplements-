@@ -40,13 +40,18 @@ const AdminOverview = () => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setRecentOrders(orders.slice(0, 5));
       
-      const totalSales = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-      const todaySales = orders.filter(o => o.createdAt.startsWith(today)).reduce((sum, o) => sum + o.totalAmount, 0);
-      const todayOrders = orders.filter(o => o.createdAt.startsWith(today)).length;
+      const totalSales = orders
+        .filter(o => o.status === 'delivered')
+        .reduce((sum, o) => sum + o.totalAmount, 0);
+      const todaySales = orders
+        .filter(o => o.createdAt.startsWith(today) && o.status === 'delivered')
+        .reduce((sum, o) => sum + o.totalAmount, 0);
+      const totalOrders = orders.filter(o => o.status === 'delivered').length;
+      const todayOrders = orders.filter(o => o.createdAt.startsWith(today) && o.status === 'delivered').length;
       
       setStats(prev => ({ 
         ...prev, 
-        totalOrders: orders.length, 
+        totalOrders, 
         todayOrders,
         totalSales,
         todaySales
@@ -59,7 +64,7 @@ const AdminOverview = () => {
       }).reverse();
 
       const chartData = last7Days.map(date => {
-        const dayOrders = orders.filter(o => o.createdAt.startsWith(date));
+        const dayOrders = orders.filter(o => o.createdAt.startsWith(date) && o.status === 'delivered');
         return {
           date: new Date(date).toLocaleDateString('en-IN', { weekday: 'short' }),
           sales: dayOrders.reduce((sum, o) => sum + o.totalAmount, 0),
@@ -90,10 +95,10 @@ const AdminOverview = () => {
       const refs = snapshot.docs.map(doc => doc.data() as Referral);
       const today = new Date().toISOString().split('T')[0];
       const earnedCommission = refs
-        .filter(r => r.status === 'earned')
+        .filter(r => r.status === 'earned' || r.status === 'matured')
         .reduce((sum, r) => sum + r.amount, 0);
       const todayCommission = refs
-        .filter(r => r.status === 'earned' && r.createdAt.startsWith(today))
+        .filter(r => (r.status === 'earned' || r.status === 'matured') && r.createdAt.startsWith(today))
         .reduce((sum, r) => sum + r.amount, 0);
       setStats(prev => ({ ...prev, totalCommission: earnedCommission, todayCommission }));
     }, (error) => {

@@ -45,6 +45,7 @@ const Navbar = () => {
     { name: 'Shop', path: '/shop' },
     { name: 'Your Trainer', path: '/trainer' },
     { name: 'MyCampaign', path: '/my-campaign' },
+    { name: 'Track Orders', path: '/orders' },
   ];
 
   return (
