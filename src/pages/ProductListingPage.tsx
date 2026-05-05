@@ -22,6 +22,13 @@ const ProductListingPage = () => {
   const searchQuery = searchParams.get('q')?.toLowerCase() || '';
 
   useEffect(() => {
+    // SEO Meta
+    document.title = "Shop Gym Supplements in Purnea, Bihar | Purnea Supps";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute("content", "Buy premium whey protein, mass gainers, and gym gear in Purnea. Authentic supplements with 2-5 hours delivery in Line Bazar, Gulabbagh, and nearby.");
+    }
+
     let q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     
     if (categoryFilter) {

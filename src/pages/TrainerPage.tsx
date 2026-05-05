@@ -110,6 +110,15 @@ const TrainerPage = () => {
     const unsubProfile = onSnapshot(doc(db, 'settings', 'trainer'), (docSnap) => {
       if (docSnap.exists()) {
         setTrainerProfile(docSnap.data() as TrainerProfile);
+      } else {
+        // Provide a default profile so the page isn't empty
+        setTrainerProfile({
+          name: "Coach Bhavyapurnea",
+          experience: "5+ Years Certified Elite Coach",
+          bio: "I've helped hundreds of people in Purnea achieve their dream physique. My goal is to make fitness accessible and sustainable for everyone in our community.",
+          photoURL: "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=1974&auto=format&fit=crop",
+          updatedAt: new Date().toISOString()
+        });
       }
     });
 
@@ -670,8 +679,20 @@ const TrainerPage = () => {
         {/* Chat Input */}
         <div className="p-6 bg-white border-t border-gray-100">
           {isExpired ? (
-            <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-center text-xs font-black uppercase tracking-widest">
-              This session has expired. Please purchase a new session to continue.
+            <div className="bg-red-50 p-6 rounded-[2rem] border border-red-100 flex flex-col items-center gap-4">
+              <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-black text-red-900 uppercase tracking-tight">Session Expired</p>
+                <p className="text-xs font-medium text-red-600 mt-1">Please purchase a new session to continue your fitness journey.</p>
+              </div>
+              <button 
+                onClick={handleBuy}
+                className="w-full bg-red-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95 flex items-center justify-center gap-2"
+              >
+                Buy New Session <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           ) : (
             <div className="flex gap-3">

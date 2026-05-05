@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /checkout
+Disallow: /profile
+
+Sitemap: https://purneasupps.com/sitemap.xml

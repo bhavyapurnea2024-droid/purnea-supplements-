@@ -142,6 +142,12 @@ const AdminOrders = () => {
                   <td className="px-6 py-4">
                     <p className="text-sm font-bold text-gray-900">{order.shippingAddress.fullName}</p>
                     <p className="text-[10px] text-gray-500">{order.shippingAddress.phone}</p>
+                    {order.referralCode && (
+                      <div className="flex items-center gap-1 mt-1 bg-orange-50 px-2 py-0.5 rounded w-fit">
+                        <Tag className="w-3 h-3 text-orange-600" />
+                        <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest">{order.referralCode}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 group/addr">

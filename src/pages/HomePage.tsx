@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight, Utensils, Dumbbell, MessageSquare, MessageCircle, HelpCircle } from 'lucide-react';
+import { ArrowRight, Star, ShieldCheck, Zap, TrendingUp, Users, ChevronRight, Utensils, Dumbbell, MessageSquare, MessageCircle, HelpCircle, Calculator } from 'lucide-react';
 import { CATEGORIES, WHATSAPP_NUMBER } from '../constants';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import SchemaMarkup from '../components/SchemaMarkup';
 
 const HomePage = () => {
   const [categoryImages, setCategoryImages] = useState<Record<string, string>>({});
@@ -17,6 +18,13 @@ const HomePage = () => {
   };
 
   useEffect(() => {
+    // SEO Meta
+    document.title = "Best Gym & Supplements Store in Purnea, Bihar | Purnea Supps";
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute("content", "Purnea Supps is the #1 destination for gym supplements, personal training, and muscle gain programs in Purnea, Bihar. Get premium whey protein and fat loss coaching today.");
+    }
+
     // Immediate preloads for known static images
     preloadImage("https://picsum.photos/seed/fitness-hero/1920/1080");
     preloadImage("https://picsum.photos/seed/trainer-promo/1920/1080");
@@ -45,8 +53,26 @@ const HomePage = () => {
     fetchImages();
   }, []);
 
+  const localBusinessSchema = {
+    "name": "Purnea Supps",
+    "image": "https://purneasupps.com/logo.png",
+    "@id": "https://purneasupps.com",
+    "url": "https://purneasupps.com",
+    "telephone": "+91 74888 04611",
+    "priceRange": "₹₹",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "LINE BAZAR",
+      "addressLocality": "Purnea",
+      "addressRegion": "Bihar",
+      "postalCode": "854301",
+      "addressCountry": "IN"
+    }
+  };
+
   return (
     <div className="flex flex-col">
+      <SchemaMarkup type="LocalBusiness" data={localBusinessSchema} />
       {/* Hero Section */}
       <section className="relative h-[600px] flex items-center overflow-hidden bg-gray-950">
         <div className="absolute inset-0 z-0 opacity-40">
@@ -70,8 +96,8 @@ const HomePage = () => {
             className="max-w-2xl"
           >
             <span className="inline-block px-3 py-1 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded-full mb-6">Premium Supplements</span>
-            <h1 className="text-5xl md:text-7xl font-black text-white leading-[0.9] tracking-tighter mb-6">
-              FUEL YOUR <span className="text-orange-600">AMBITION</span>.
+            <h1 className="text-5xl md:text-7xl font-black text-white leading-[0.9] tracking-tighter mb-6 uppercase">
+              PURNEA FUEL YOUR <span className="text-orange-600">AMBITION</span>.
             </h1>
             <p className="text-lg text-gray-300 mb-8 leading-relaxed">
               Unlock your true potential with science-backed supplements designed for elite performance. Join the Purnea community and earn while you grow.
@@ -80,8 +106,8 @@ const HomePage = () => {
               <Link to="/shop" className="bg-orange-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-orange-700 transition-all flex items-center gap-2 group">
                 Shop Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link to="/my-campaign" className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/20 transition-all">
-                Join MyCampaign
+              <Link to="/calorie-calculator" className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/20 transition-all flex items-center gap-2">
+                <Calculator className="w-5 h-5" /> Calorie Calculator
               </Link>
             </div>
           </motion.div>
@@ -92,12 +118,12 @@ const HomePage = () => {
       <section className="py-12 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { icon: ShieldCheck, label: 'Lab Tested', sub: '100% Pure' },
-              { icon: Zap, label: 'Fast Delivery', sub: 'Pan India' },
-              { icon: TrendingUp, label: 'Results Driven', sub: 'Science Backed' },
-              { icon: Users, label: 'Community', sub: 'Refer & Earn' },
-            ].map((item, i) => (
+                {[
+                  { icon: ShieldCheck, label: 'Lab Tested', sub: '100% Pure' },
+                  { icon: Zap, label: '2-5 Hours Delivery', sub: 'In Some Products' },
+                  { icon: TrendingUp, label: 'Results Driven', sub: 'Science Backed' },
+                  { icon: Users, label: 'Community', sub: 'Refer & Earn' },
+                ].map((item, i) => (
               <div key={i} className="flex flex-col items-center text-center">
                 <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 mb-4">
                   <item.icon className="w-6 h-6" />
@@ -136,19 +162,17 @@ const HomePage = () => {
                   to={`/shop?category=${cat}`}
                   className="group relative h-48 rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-sm hover:shadow-2xl transition-all flex flex-col"
                 >
-                  {/* Category Image - Now Clear (Opacity 100) */}
-                  <div className="absolute inset-0 h-full w-full">
+                  {/* Category Image - Now Contain with padding to prevent zoom effect */}
+                  <div className="absolute inset-0 h-full w-full p-4 flex items-center justify-center">
                     <img 
                       src={categoryImages[cat] || `https://picsum.photos/seed/${cat}/800/800`} 
                       alt={cat} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 blur-0 bg-gray-100 img-fade-in" 
+                      className="max-w-full max-h-full object-contain transition-transform duration-700 blur-0 bg-white img-fade-in" 
                       referrerPolicy="no-referrer" 
                       loading="eager"
                       decoding="async"
                       {...{ fetchPriority: i < 3 ? "high" : "auto" }}
                     />
-                    {/* Dark gradient at bottom to help with text if needed, but we'll use a white background for the label */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   </div>
                   
                   {/* Category Name with White Background */}
@@ -181,7 +205,7 @@ const HomePage = () => {
               <div className="space-y-4 mb-8">
                 {[
                   'Get a unique coupon code instantly',
-                  'Friends get 10-20% discount using your code',
+                  'Friends get 5 to 20% discount using your code',
                   'You earn 5% commission on every order',
                   'Withdraw earnings directly to your UPI'
                 ].map((text, i) => (

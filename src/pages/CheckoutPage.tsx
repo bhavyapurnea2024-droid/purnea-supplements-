@@ -646,7 +646,7 @@ const CheckoutPage = () => {
                   <p className="text-xs font-bold text-orange-900 uppercase tracking-tight">Referral Benefits</p>
                 </div>
                 <p className="text-[10px] text-orange-700 leading-relaxed">
-                  Using a referral code saves you 10-20% and helps your friend earn commission. It's a win-win!
+                  Using a referral code saves you 5-20% and helps your friend earn commission. It's a win-win!
                 </p>
               </div>
             </div>

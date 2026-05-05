@@ -57,11 +57,12 @@ const AdminWithdrawals = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">User Details</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Name & Referral</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Contact Info</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">UPI ID</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Amount</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Withdrawal Info</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Status</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -70,18 +71,22 @@ const AdminWithdrawals = () => {
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
                       <p className="text-sm font-black text-gray-900 uppercase tracking-tight">{w.userName || 'Unknown'}</p>
-                      <p className="text-[10px] text-gray-500 font-bold">{w.userEmail}</p>
-                      <p className="text-[10px] text-orange-600 font-black tracking-widest mt-1">CODE: {w.referralCode || 'N/A'}</p>
-                      <p className="text-[10px] text-gray-400 font-mono mt-1">{w.userId}</p>
+                      <p className="text-[10px] text-orange-600 font-black tracking-widest mt-1">REF: {w.referralCode || 'N/A'}</p>
+                      <p className="text-[10px] text-gray-400 font-mono mt-0.5">{w.userId}</p>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-black text-gray-900">₹{w.amount}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <p className="text-sm text-gray-600 font-bold">{w.upiId}</p>
-                      {w.userPhone && <p className="text-[10px] text-gray-400 font-bold">{w.userPhone}</p>}
+                      <p className="text-sm text-gray-700 font-bold">{w.userPhone || 'No Phone'}</p>
+                      <p className="text-[10px] text-gray-500 font-medium">{w.userEmail}</p>
                     </div>
                   </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-bold text-gray-900 bg-gray-100 px-3 py-1 rounded-lg">
+                      {w.upiId || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-black text-orange-600 text-lg">₹{w.amount}</td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                       <span className={cn(
@@ -99,21 +104,28 @@ const AdminWithdrawals = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {w.status === 'pending' && (
+                    {w.status === 'pending' ? (
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => handleStatusUpdate(w, 'approved')}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-700 shadow-lg shadow-green-600/20 transition-all active:scale-95"
+                          title="Approve Withdrawal"
                         >
-                          <CheckCircle2 className="w-5 h-5" />
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Approve
                         </button>
                         <button 
                           onClick={() => handleStatusUpdate(w, 'rejected')}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          title="Reject Withdrawal"
                         >
                           <XCircle className="w-5 h-5" />
                         </button>
                       </div>
+                    ) : (
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                        {w.processedAt ? `Processed ${new Date(w.processedAt).toLocaleDateString()}` : 'Processed'}
+                      </span>
                     )}
                   </td>
                 </tr>

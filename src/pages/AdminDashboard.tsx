@@ -15,7 +15,8 @@ import {
   CreditCard,
   User as UserIcon,
   Sparkles,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -31,6 +32,7 @@ import AdminSettings from '../components/AdminSettings';
 import AdminSpecialSale from '../components/AdminSpecialSale';
 import AdminCategoryImages from '../components/AdminCategoryImages';
 import AdminTrainerManager from '../components/AdminTrainerManager';
+import AdminReviews from '../components/AdminReviews';
 
 const AdminDashboard = () => {
   const { user, profile, logout } = useAuth();
@@ -63,6 +65,7 @@ const AdminDashboard = () => {
     { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Withdrawals', path: '/admin/withdrawals', icon: CreditCard },
+    { name: 'Reviews', path: '/admin/reviews', icon: Star },
     { name: 'Referrals', path: '/admin/referrals', icon: TrendingUp },
     { name: 'Analytics', path: '/admin/analytics', icon: TrendingUp },
     { name: 'Trainer Manager', path: '/admin/trainer', icon: UserIcon },
@@ -170,6 +173,7 @@ const AdminDashboard = () => {
               <Route path="orders" element={<AdminOrders />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="withdrawals" element={<AdminWithdrawals />} />
+              <Route path="reviews" element={<AdminReviews />} />
               <Route path="referrals" element={<AdminReferrals />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="special-sale" element={<AdminSpecialSale />} />

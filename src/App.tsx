@@ -20,8 +20,11 @@ import OrderHistoryPage from './pages/OrderHistoryPage';
 import LoginPage from './pages/LoginPage';
 import PaymentStatusPage from './pages/PaymentStatusPage';
 import TrainerPage from './pages/TrainerPage';
+import ContactPage from './pages/ContactPage';
+import CalorieCalculatorPage from './pages/CalorieCalculatorPage';
 import { LoginModal } from './components/LoginModal';
 import SpecialSaleBanner from './components/SpecialSaleBanner';
+import ScrollToTop from './components/ScrollToTop';
 
 const Navbar = () => {
   const { user, profile, isAdmin, logout, setIsLoginModalOpen } = useAuth();
@@ -43,7 +46,8 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Shop', path: '/shop' },
-    { name: 'Your Trainer', path: '/trainer' },
+    { name: 'Calorie Calculator', path: '/calorie-calculator' },
+    { name: 'Trainer Program', path: '/trainer' },
     { name: 'MyCampaign', path: '/my-campaign' },
     { name: 'Track Orders', path: '/orders' },
   ];
@@ -163,7 +167,10 @@ const Navbar = () => {
                   key={link.path} 
                   to={link.path} 
                   onClick={() => setIsMenuOpen(false)}
-                  className="block text-lg font-bold text-gray-900"
+                  className={cn(
+                    "block text-lg font-bold transition-colors",
+                    location.pathname === link.path ? "text-orange-600" : "text-gray-900"
+                  )}
                 >
                   {link.name}
                 </Link>
@@ -224,9 +231,11 @@ const Footer = () => (
           <h4 className="text-white font-bold mb-6">Quick Links</h4>
           <ul className="space-y-4 text-sm">
             <li><Link to="/shop" className="hover:text-orange-500 transition-colors">Shop All</Link></li>
-            <li><Link to="/trainer" className="hover:text-orange-500 transition-colors">Your Trainer</Link></li>
+            <li><Link to="/calorie-calculator" className="hover:text-orange-500 transition-colors">Calorie Calculator</Link></li>
+            <li><Link to="/trainer" className="hover:text-orange-500 transition-colors">Trainer Program</Link></li>
             <li><Link to="/my-campaign" className="hover:text-orange-500 transition-colors">MyCampaign</Link></li>
             <li><Link to="/orders" className="hover:text-orange-500 transition-colors">Order Tracking</Link></li>
+            <li><Link to="/contact" className="hover:text-orange-500 transition-colors">Contact & Location</Link></li>
             <li><Link to="/about" className="hover:text-orange-500 transition-colors">About Us</Link></li>
           </ul>
         </div>
@@ -258,10 +267,15 @@ const Footer = () => (
           </ul>
         </div>
       </div>
-      <div className="mt-12 pt-8 border-t border-gray-900 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
-        <p>© 2026 Purnea Supplements. All rights reserved.</p>
+      <div className="mt-12 pt-8 border-t border-gray-900 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-center md:text-left">
+        <div className="space-y-4">
+          <p>© 2026 Purnea Supplements. All rights reserved.</p>
+          <p className="text-gray-600 max-w-2xl mx-auto md:mx-0">
+            Serving Purnea and nearby localities: Line Bazar, Gulabbagh, Maranga, Khushkibagh, Rambagh, Kasba, Katihar, Araria, and Kishanganj. Best Gym in Purnea | Supplements Shop in Purnea | Fitness Center Bihar.
+          </p>
+        </div>
         <div className="flex items-center gap-6">
-          <span>Made with ❤️ for Fitness</span>
+          <span>Made with ❤️ for Purnea</span>
         </div>
       </div>
     </div>
@@ -275,6 +289,7 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans selection:bg-orange-100 selection:text-orange-900">
+      <ScrollToTop />
       {!isAdminRoute && <SpecialSaleBanner />}
       {!isAdminRoute && <Navbar />}
       <main className="flex-grow">
@@ -286,6 +301,8 @@ const AppContent = () => {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/my-campaign" element={<MyCampaignPage />} />
           <Route path="/trainer" element={<TrainerPage />} />
+          <Route path="/calorie-calculator" element={<CalorieCalculatorPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/admin/*" element={<AdminDashboard />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/payment-status" element={<PaymentStatusPage />} />

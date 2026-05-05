@@ -51,6 +51,8 @@ export interface Product {
   rating: number;
   numReviews: number;
   salesCount: number;
+  soldCount?: number;
+  image?: string;
   commissionRate?: number; // Custom commission rate for this specific product
   specialOffer?: string; // Text for special offer badge
   createdAt: string;
@@ -76,6 +78,7 @@ export interface Order {
   totalAmount: number;
   discountAmount: number;
   referralAmount?: number; // Commission amount generated for the referrer
+  referralCode?: string;
   couponUsed?: string | null;
   referralUserId?: string | null;
   status: OrderStatus;
@@ -166,4 +169,15 @@ export interface TrainerProfile {
   experience: string;
   photoURL?: string;
   updatedAt: string;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  userId: string;
+  userName: string;
+  userPhoto?: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }
